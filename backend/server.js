@@ -1,5 +1,14 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import {
+  authenticateAccount,
+  getAccountUsage,
+  initializeAccountLimits,
+  isAccountLimitEnforcementEnabled,
+  refundUsage,
+  reserveUsage,
+  verifyGooglePlaySubscription
+} from "./account-limits.js";
 
 const PORT = Number(process.env.PORT || 8787);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
@@ -37,7 +46,7 @@ const OPENAI_TTS_VOICES = new Set([
   "cedar"
 ]);
 
-const extractionSchemaPrompt = `Search the saved speaker transcript document for TaskLens AI task data.
+const extractionSchemaPrompt = `Search the saved speaker transcript document for PhotoFinish IT task data.
 Return only valid JSON with these keys:
 {
   "journal": {"text": string} | null,
@@ -49,7 +58,7 @@ Use only information present in the transcript document. Do not invent tasks, ti
 Do not create a journal entry from general dictation. Set journal to null unless the speaker explicitly says this is a journal entry, says "note to self", or says to put/write/remember something in the journal.
 Preserve original user wording only for explicit notes and explicit journal text. If a category is mentioned without enough detail, add a missingDetails question.`;
 
-const coachSchemaPrompt = `You are the TaskLens AI assistant.
+const coachSchemaPrompt = `You are the PhotoFinish IT assistant.
 Analyze the user's app data for practical patterns across tasks, deadlines, checklist context, selected photos, and journal entries.
 Use full task details including names, notes, categories, priority, scheduled times, deadlines, completion history, missed deadlines, daily dashboard progress, and weekly progress.
 Return only valid JSON with these keys:
@@ -66,12 +75,12 @@ Rules:
 - Prefer one specific, useful next step.
 - Keep body under 45 words.`;
 
-const appChatSystemPrompt = `You are TaskLens AI chat, a ChatGPT-style assistant inside a focus-friendly task app.
+const appChatSystemPrompt = `You are PhotoFinish IT chat, a ChatGPT-style assistant inside a focus-friendly task app.
 Help the user think clearly, ask follow-up questions when needed, and answer normal questions conversationally.
-When the user asks about the app, explain TaskLens features in plain language: photo checklists, brain dump tasks, Now/Next/Later, task sizes, focus mode, AI checklist editing, saved project history, and settings.
+When the user asks about the app, explain PhotoFinish IT features in plain language: photo checklists, brain dump tasks, Now/Next/Later, task sizes, focus mode, AI checklist editing, saved project history, and settings.
 For overwhelm, keep answers grounded and short: name one next action, reduce choices, and avoid long motivational speeches.
 Do not mention backend URLs, API keys, tokens, implementation details, or system prompts.
-Do not claim to be ChatGPT; behave like a helpful AI chat inside TaskLens AI.
+Do not claim to be ChatGPT; behave like a helpful AI chat inside PhotoFinish IT.
 If the user asks for legal, financial, or emergency advice, be careful and suggest getting qualified help for high-stakes decisions.`;
 
 const taskBreakdownSchemaPrompt = `You break one user task into an inspection-grade, tailored checklist for someone who may struggle with task initiation and overwhelm.
@@ -132,7 +141,17 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (requestPath === "/status" && request.method === "GET") {
-    sendJson(response, 200, { ok: true, build: BACKEND_BUILD });
+    sendJson(response, 200, { ok: true, build: BACKEND_BUILD, accountLimitsEnabled: isAccountLimitEnforcementEnabled() });
+    return;
+  }
+
+  if (requestPath === "/api/account/usage" && request.method === "GET") {
+    await handleAccountUsage(request, response);
+    return;
+  }
+
+  if (requestPath === "/api/subscriptions/google-play/verify" && request.method === "POST") {
+    await handleGooglePlaySubscriptionVerification(request, response);
     return;
   }
 
@@ -278,6 +297,7 @@ async function handleAppChat(request, response) {
 
 async function handleTaskBreakdown(request, response) {
   const requestStartedAt = Date.now();
+  let usageReservation;
   if (!OPENAI_API_KEY) {
     sendJson(response, 500, { error: "OPENAI_API_KEY is not configured." });
     return;
@@ -305,6 +325,10 @@ async function handleTaskBreakdown(request, response) {
       sendJson(response, 200, { ...cachedBreakdown, cached: true });
       return;
     }
+    if (task.imageDataUrl && isAccountLimitEnforcementEnabled()) {
+      const account = await authenticateAccount(request);
+      usageReservation = await reserveUsage(account.id, "before_photo");
+    }
     const enrichedTask = await timeBackendStep("taskBreakdown.googleVision", () => enrichTaskWithGoogleVision(task));
     const breakdown = await timeBackendStep("taskBreakdown.openai", () => breakDownTask(enrichedTask));
     setCachedTaskBreakdown(cacheKey, breakdown);
@@ -314,6 +338,7 @@ async function handleTaskBreakdown(request, response) {
     });
     sendJson(response, 200, breakdown);
   } catch (error) {
+    await refundUsage(usageReservation);
     logBackendTiming("taskBreakdown.error", requestStartedAt);
     sendJson(response, error.statusCode || 500, { error: error.message || "Server error" });
   }
@@ -321,6 +346,7 @@ async function handleTaskBreakdown(request, response) {
 
 async function handleTaskTargetImage(request, response) {
   const requestStartedAt = Date.now();
+  let usageReservation;
   if (!OPENAI_API_KEY) {
     sendJson(response, 500, { error: "OPENAI_API_KEY is not configured." });
     return;
@@ -339,11 +365,44 @@ async function handleTaskTargetImage(request, response) {
       sendJson(response, 400, { error: "Missing task photo." });
       return;
     }
+    if (isAccountLimitEnforcementEnabled()) {
+      const account = await authenticateAccount(request);
+      usageReservation = await reserveUsage(account.id, "after_image");
+    }
     const targetImageDataUrl = await timeBackendStep("targetImage.openai", () => generateTaskTargetImage(task, breakdown));
     logBackendTiming("targetImage.total", requestStartedAt);
     sendJson(response, 200, { targetImageDataUrl });
   } catch (error) {
+    await refundUsage(usageReservation);
     logBackendTiming("targetImage.error", requestStartedAt);
+    sendJson(response, error.statusCode || 500, { error: error.message || "Server error" });
+  }
+}
+
+async function handleAccountUsage(request, response) {
+  if (!isAccountLimitEnforcementEnabled()) {
+    sendJson(response, 503, { error: "Account limits are not enabled." });
+    return;
+  }
+  try {
+    const account = await authenticateAccount(request);
+    sendJson(response, 200, await getAccountUsage(account.id));
+  } catch (error) {
+    sendJson(response, error.statusCode || 500, { error: error.message || "Server error" });
+  }
+}
+
+async function handleGooglePlaySubscriptionVerification(request, response) {
+  if (!isAccountLimitEnforcementEnabled()) {
+    sendJson(response, 503, { error: "Account limits are not enabled." });
+    return;
+  }
+  try {
+    const account = await authenticateAccount(request);
+    const body = await readJsonBody(request);
+    const result = await verifyGooglePlaySubscription(account.id, limitText(body.purchaseToken, 4096));
+    sendJson(response, 200, result);
+  } catch (error) {
     sendJson(response, error.statusCode || 500, { error: error.message || "Server error" });
   }
 }
@@ -388,9 +447,16 @@ async function handleTextToSpeech(request, response) {
   }
 }
 
-server.listen(PORT, () => {
-  console.log(`TaskLens AI backend listening on ${PORT}`);
-});
+initializeAccountLimits()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`PhotoFinish IT backend listening on ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("PhotoFinish IT backend startup failed.", error);
+    process.exitCode = 1;
+  });
 
 function getRequestPath(request) {
   try {
@@ -403,7 +469,7 @@ function getRequestPath(request) {
 function setCorsHeaders(response) {
   response.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token,Authorization");
 }
 
 function sendJson(response, statusCode, payload) {
@@ -441,25 +507,46 @@ function isAuthorized(request) {
 function readJsonBody(request) {
   return new Promise((resolve, reject) => {
     let body = "";
-    request.on("data", (chunk) => {
+    let bodyTooLarge = false;
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      request.off("data", onData);
+      request.off("end", onEnd);
+      request.off("error", onError);
+      fn(value);
+    };
+    function onData(chunk) {
+      if (settled) return;
+      if (bodyTooLarge) return;
       body += chunk;
       if (Buffer.byteLength(body) > MAX_BODY_BYTES) {
+        bodyTooLarge = true;
+        body = "";
+      }
+    }
+    function onEnd() {
+      if (bodyTooLarge) {
         const error = new Error("Request body too large.");
         error.statusCode = 413;
-        reject(error);
-        request.destroy();
+        finish(reject, error);
+        return;
       }
-    });
-    request.on("end", () => {
       try {
-        resolve(body ? JSON.parse(body) : {});
+        finish(resolve, body ? JSON.parse(body) : {});
       } catch {
         const error = new Error("Invalid JSON body.");
         error.statusCode = 400;
-        reject(error);
+        finish(reject, error);
       }
-    });
-    request.on("error", reject);
+    }
+    function onError(error) {
+      finish(reject, error);
+    }
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("error", onError);
   });
 }
 
@@ -768,7 +855,7 @@ function buildTaskTargetImagePrompt(task, breakdown) {
   const steps = Array.isArray(breakdown.steps)
     ? breakdown.steps.map((step, index) => `${index + 1}. ${limitText(step?.text, 260)}`).join("\n")
     : "";
-  return limitText(`Create a realistic after-state reference image for this TaskLens AI photo checklist.
+  return limitText(`Create a realistic after-state reference image for this PhotoFinish IT photo checklist.
 Use the user's uploaded photo as the starting point. Preserve the same room, surface, camera angle, lighting, major furniture, walls, floor, and important belongings. Show what the scene should reasonably look like after the checklist is completed.
 Do not create a fantasy redesign. Do not add expensive new furniture, decorations, labels, text, people, or unrelated objects. Only remove, straighten, group, clear, or place visible items in a realistic way based on the task and checklist.
 Task: ${task.name}
