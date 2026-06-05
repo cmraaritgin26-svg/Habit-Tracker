@@ -289,8 +289,13 @@ async function handleTaskBreakdown(request, response) {
   }
 
   try {
-    const body = await readJsonBody(request);
-    const task = sanitizeTaskForBreakdown(body.task || body);
+    const contentType = String(request.headers["content-type"] || "").toLowerCase();
+    const hasRawPhotoBody = /^image\//i.test(contentType) || contentType === "application/octet-stream";
+    const body = hasRawPhotoBody ? await readBufferBody(request) : await readJsonBody(request);
+    const taskMeta = hasRawPhotoBody ? readTaskMetaHeader(request) : {};
+    const task = sanitizeTaskForBreakdown(hasRawPhotoBody
+      ? { ...taskMeta, imageDataUrl: bufferToDataUrl(body, contentType) }
+      : body.task || body);
     if (!task || !task.name) {
       sendJson(response, 400, { error: "Missing task." });
       return;
@@ -461,6 +466,52 @@ function readJsonBody(request) {
     });
     request.on("error", reject);
   });
+}
+
+function readBufferBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let totalBytes = 0;
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      request.off("data", onData);
+      request.off("end", onEnd);
+      request.off("error", onError);
+      fn(value);
+    };
+    function onData(chunk) {
+      if (settled) return;
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_BODY_BYTES) {
+        const error = new Error("Request body too large.");
+        error.statusCode = 413;
+        finish(reject, error);
+        return;
+      }
+      chunks.push(chunk);
+    }
+    function onEnd() {
+      finish(resolve, Buffer.concat(chunks));
+    }
+    function onError(error) {
+      finish(reject, error);
+    }
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("error", onError);
+  });
+}
+
+function readTaskMetaHeader(request) {
+  const headerValue = String(request.headers["x-task-meta"] || "").trim();
+  if (!headerValue) return {};
+  try {
+    return JSON.parse(decodeURIComponent(headerValue));
+  } catch {
+    return {};
+  }
 }
 
 async function extractDictation(transcript) {
@@ -998,6 +1049,12 @@ function limitImageDataUrl(value) {
   if (!text) return "";
   if (!/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(text)) return "";
   return text.slice(0, 2_200_000);
+}
+
+function bufferToDataUrl(buffer, contentType) {
+  const mime = /^image\/(?:png|jpe?g|webp)$/i.test(contentType) ? contentType.toLowerCase() : "image/jpeg";
+  const normalizedMime = mime.replace("image/jpg", "image/jpeg");
+  return `data:${normalizedMime};base64,${Buffer.from(buffer).toString("base64")}`;
 }
 
 function normalizeTaskBreakdownResponse(data, task) {
