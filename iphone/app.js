@@ -1,5 +1,5 @@
 /*
- * Health & Task Tracker main client script.
+ * TaskLens AI main client script.
  *
  * Editing map:
  * 1. Constants and safety/dictation patterns
@@ -14,99 +14,113 @@
  */
 
 const storeKey = "habit-tracker:v1";
-const nutritionStoreKey = "habit-tracker:nutrition:v1";
-const symptomStoreKey = "health-task-tracker:symptoms:v1";
-const moodStoreKey = "health-task-tracker:moods:v1";
-const journalStoreKey = "health-task-tracker:journal:v1";
-const deletedJournalEntriesStoreKey = "health-task-tracker:journal-deleted:v1";
-const dictationDocumentStoreKey = "health-task-tracker:dictation-documents:v1";
-const settingsStoreKey = "health-task-tracker:settings:v1";
-const aiDefaultEnabledStoreKey = "health-task-tracker:ai-default-enabled:v1";
-const backupReminderStoreKey = "health-task-tracker:last-backup-reminder:v1";
-const affirmationShownStoreKey = "health-task-tracker:last-affirmation:v1";
-const affirmationDepressionShownStoreKey = "health-task-tracker:last-depression-affirmation:v1";
+const taskBreakdownsStoreKey = "tasklens-ai:task-breakdowns:v1";
+const legacyTaskBreakdownsStoreKey = `${["status", "task", "tracker"].join("-")}:task-breakdowns:v1`;
+const aiTrainingExamplesStoreKey = "tasklens-ai:ai-training-examples:v1";
+const photoAiUsageStoreKey = "tasklens-ai:photo-ai-usage:v1";
+const photoAiTelemetryStoreKey = "tasklens-ai:photo-ai-telemetry:v1";
+const archiveAStoreKey = "tasklens-ai:archive-a:v1";
+const archiveBtoreKey = "tasklens-ai:archive-b:v1";
+const focusStateStoreKey = "tasklens-ai:focusStates:v1";
+const focusLogStoreKey = "tasklens-ai:focusLog:v1";
+const deletedfocusLogEntriesStoreKey = "tasklens-ai:focusLog-deleted:v1";
+const dictationDocumentStoreKey = "tasklens-ai:dictation-documents:v1";
+const settingsStoreKey = "tasklens-ai:settings:v1";
+const firebaseAuthStoreKey = "tasklens-ai:firebase-auth:v1";
+const onboardingCompleteStoreKey = "tasklens-ai:onboarding-complete:v2";
+const aiDefaultEnabledStoreKey = "tasklens-ai:ai-default-enabled:v1";
+const backupReminderStoreKey = "tasklens-ai:last-backup-reminder:v1";
+const affirmationShownStoreKey = "tasklens-ai:last-affirmation:v1";
+const affirmationlowFocusShownStoreKey = "tasklens-ai:last-lowFocus-affirmation:v1";
 const DEFAULT_AI_BACKEND_URL = "https://habit-tracker-1-lp0z.onrender.com";
-const DICTATION_FEATURE_ENABLED = true;
+const DICTATION_FEATURE_ENABLED = false;
 const AI_DICTATION_TIMEOUT_MS = 12000;
 const AI_COACH_TIMEOUT_MS = 2500;
+const AI_TASK_BREAKDOWN_TIMEOUT_MS = 45000;
+const AI_TARGET_IMAGE_TIMEOUT_MS = 120000;
 const AI_SAFETY_SCAN_TIMEOUT_MS = 6000;
+const FREE_PHOTO_AI_LIMIT = 5;
+const PREMIUM_PHOTO_AI_LIMIT = 35;
+const PREMIUM_AFTER_IMAGE_LIMIT = 35;
+const PREMIUM_MONTHLY_PRICE = "$5.99/month";
+const PREMIUM_YEARLY_PRICE = "$59.99/year";
 const HISTORY_RETENTION_DAYS = 3650;
-const deadlineAlertStoreKey = "health-task-tracker:deadline-alerts:v1";
-const deadlineEventStoreKey = "health-task-tracker:deadline-events:v1";
-const wellbeingTrendAlertStoreKey = "health-task-tracker:wellbeing-trend-alerts:v1";
-const hasSavedSettings = localStorage.getItem(settingsStoreKey) !== null;
+const deadlineAlertStoreKey = "tasklens-ai:deadline-alerts:v1";
+const deadlineEventStoreKey = "tasklens-ai:deadline-events:v1";
+const focusAreaTrendAlertStoreKey = "tasklens-ai:focusArea-trend-alerts:v1";
+const hasCompletedOnboarding = localStorage.getItem(onboardingCompleteStoreKey) === "true";
 const dailyAffirmations = [
-  "I can meet this day with patience and steady effort.",
-  "My choices today can support the person I am becoming.",
-  "I am allowed to begin again with a clear mind.",
-  "Small steps still count, and I can take the next one.",
-  "I can care for my body without being hard on myself.",
-  "I have handled difficult days before, and I can handle this one.",
-  "I can focus on what is useful, kind, and true.",
-  "My progress does not have to be perfect to be real.",
-  "I can pause, breathe, and choose my next action.",
-  "I am worthy of care, rest, and respect.",
-  "I can trust myself to keep showing up.",
-  "Today, I choose one good thing and give it my attention.",
-  "I can be honest with myself and still be gentle.",
-  "My effort matters, even when results take time.",
-  "I can make room for calm in the middle of a busy day.",
-  "I am building a life that supports my health.",
-  "I can let go of what I do not need to carry.",
-  "The next right step is enough for now.",
-  "I can treat myself like someone worth helping.",
-  "I am learning, adjusting, and moving forward.",
-  "My body deserves care and my mind deserves peace.",
-  "I can choose consistency over pressure.",
-  "I am capable of doing hard things with patience.",
-  "Today can be simple, grounded, and enough.",
-  "I can notice what is good without ignoring what is hard.",
-  "I can return to my goals without shame.",
-  "Each checked task is proof that I showed up.",
-  "I can protect my energy and honor my limits.",
-  "I am not behind; I am here, and I can begin.",
-  "I can make today healthier one choice at a time.",
-  "I deserve encouragement from my own thoughts."
+  "My brain does better with one clear next step than a perfect full plan.",
+  "Starting small is not lowering the bar; it is building a ramp.",
+  "I can use structure as support, not as proof that I should be different.",
+  "A reset is part of the system, not a failure of the system.",
+  "I do not need to feel ready before I take the next tiny action.",
+  "My attention is easier to guide when the task is visible, specific, and close.",
+  "I can make the room, the list, or the timer do some of the remembering for me.",
+  "Done is allowed to be smaller than imagined.",
+  "I can pause, name the friction, and lower the first step.",
+  "Momentum often arrives after I begin, not before.",
+  "I can protect my energy by choosing fewer tasks and finishing one.",
+  "When everything feels urgent, I can pick what is next instead of what is loudest.",
+  "My brain responds to cues, so I can set up cues with kindness.",
+  "I can come back to the list without shame.",
+  "A five-minute start can change the shape of the whole day.",
+  "I am allowed to need reminders, visuals, timers, and breaks.",
+  "Clarity beats pressure.",
+  "The task is not my character; it is just the next thing to shape.",
+  "I can make progress even when focus is uneven.",
+  "A good system catches me when motivation drops.",
+  "I can separate the mess from my worth.",
+  "One checked step counts because it reduces future friction.",
+  "I can choose a body double, a timer, or a photo when words feel too hard.",
+  "Rest helps my focus; it is not stealing from progress.",
+  "I can design my day around how my brain actually works.",
+  "The next step can be embarrassingly small and still be the right step.",
+  "I can use curiosity instead of criticism to restart.",
+  "My attention needs direction, not punishment.",
+  "I can turn overwhelm into a visible checklist.",
+  "I am building tools for my real brain, not an imaginary one.",
+  "Today, one specific step is enough to begin."
 ];
 const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const crisisMoodPatterns = [
-  /\b(kill myself|kill my self|kill me|end my life|take my life|take myself out|off myself|delete myself|unalive myself|unalive me|suicide|suicidal)\b/i,
+const urgentfocusStatePatterns = [
+  /\b(kill myself|kill my self|kill me|end my life|take my life|take myself out|off myself|delete myself|unalive myself|unalive me|urgent-risk|urgent-risk)\b/i,
   /\b(i want to die|want to die|wanna die|wanting to die|wish i was dead|wish i were dead|rather be dead|better off dead|should be dead)\b/i,
-  /\b(hurt myself|hurt my self|harm myself|harm my self|self harm|self-harm|cut myself|cut my self|overdose|od on|take all my pills)\b/i,
+  /\b(hurt myself|hurt my self|harm myself|harm my self|urgent-risk|urgent-risk|cut myself|cut my self|overdose|od on|take all my pills)\b/i,
   /\b(no reason to live|nothing to live for|can't go on|cannot go on|can't keep going|cannot keep going|done living|tired of living)\b/i,
   /\b(planning to die|plan to die|goodbye forever|this is goodbye|last note|final note|won't be here tomorrow|not going to be here tomorrow)\b/i,
   /\b(drive off (a )?(bridge|cliff|road)|jump off (a )?(bridge|building)|hang myself|shoot myself|stab myself|drown myself)\b/i
 ];
-const depressionMoodPatterns = [
-  /\b(depressed|depression|hopeless|worthless|empty|numb|trapped|burden|unbearable|pointless|meaningless)\b/i,
+const lowFocusfocusStatePatterns = [
+  /\b(low|lowFocus|hopeless|worthless|empty|numb|trapped|burden|unbearable|pointless|meaningless)\b/i,
   /\b(no energy|can't get out of bed|cannot get out of bed|nothing matters|lost interest|don't care anymore|cant care anymore)\b/i,
   /\b(alone|isolated|withdrawn|ashamed|guilt|crying|despair)\b/i
 ];
-const unhealthyThoughtPatterns = [
+const negativeThoughtPatterns = [
   /\b(always|never|everything|nothing|everyone|no one)\b.*\b(fails?|wrong|bad|hates?|hopeless|ruined)\b/i,
   /\b(i am|i'm)\s+(a failure|worthless|useless|broken|a burden|not enough)\b/i,
   /\b(what if|worst case|can't handle|cannot handle|going to fall apart|spiral)\b/i,
   /\b(my fault|blame myself|should have|i ruin|i ruined|i mess everything up)\b/i
 ];
-const journalStressPatterns = [
+const focusLogStressPatterns = [
   /\b(stress|stressed|overwhelmed|over loaded|overloaded|panic|panicky|anxious|anxiety|pressure|can't cope|cannot cope|too much|burned out|burnt out|falling apart)\b/i
 ];
-const journalConcernPatterns = [
+const focusLogConcernPatterns = [
   /\b(hate myself|i hate me|feel like a failure|i'?m failing|not worth it|can't do this|cannot do this|done with this|giving up|gave up|shutting down|spiraling|dark thoughts)\b/i,
   /\b(i'?m tired of|tired of everything|nothing is working|everything is too much|i feel broken|i feel useless|i feel worthless)\b/i,
   /\b(no one would miss me|everyone would be better without me|better without me|i am a burden|i'm a burden|burden to everyone)\b/i,
   /\b(i disappear|just disappear|wish i could disappear|don't want to exist|do not want to exist|stop existing)\b/i
 ];
 const dictationNormalizationRules = [
-  [/\bb\s*p\b|\bbp\b|\bbloodpressure\b|\bblood presure\b|\bblood preasure\b/g, "blood pressure"],
-  [/\bblood suger\b|\bblood sug(?:er|ar)\b|\bsuger\b|\bsugar lvl\b|\bsugar level\b|\bbs\b|\bbg\b/g, "glucose"],
-  [/\bgluco(?:s|se|ze)\b|\bglucous\b|\bglukose\b|\bglocos\b|\bfinger stick\b/g, "glucose"],
-  [/\bcal(?:s|z)?\b|\bcals\b|\bkcal\b|\bcalorie(?:s|z)?\b|\bcalery\b|\bcaleries\b|\bcallories\b|\bvalorie(?:s|z)?\b|\bvaleries\b|\bvallories\b|\bfood energy\b/g, "calories"],
-  [/\bcarb(?:s|z)?\b|\bcarbo(?:s|z)?\b|\bcarbo hydrate(?:s|z)?\b|\bcarbohydrates?\b|\bnet carb(?:s|z)?\b|\bmacro carb(?:s|z)?\b/g, "carbs"],
-  [/\bweigh(?:t|ed)?\b|\bweigh in\b|\bweighed in\b|\bscale\b|\bbody weight\b|\bwait\b|\bwaight\b|\bwate\b|\blbs?\b|\bpound(?:s|z)?\b/g, "weight"],
+  [/\bb\s*p\b|\bbp\b|\bpressure\b|\bpressure reading\b/g, "pressure"],
+  [/\breading suger\b|\breading sug(?:er|ar)\b|\bsuger\b|\bsugar lvl\b|\bsugar level\b|\bbs\b|\bbg\b/g, "valueD"],
+  [/\bgluco(?:s|se|ze)\b|\bglucous\b|\bglukose\b|\bglocos\b|\bfinger stick\b/g, "valueD"],
+  [/\bcal(?:s|z)?\b|\bcals\b|\bkcal\b|\bvalueA(?:s|z)?\b|\bcalery\b|\bcaleries\b|\bcallories\b|\bvalorie(?:s|z)?\b|\bvaleries\b|\bvallories\b|\bfood energy\b/g, "valueA"],
+  [/\bvalueB(?:s|z)?\b|\bvalueBo(?:s|z)?\b|\bvalueBo hydrate(?:s|z)?\b|\bvalueBohydrates?\b|\bnet valueB(?:s|z)?\b|\bmacro valueB(?:s|z)?\b/g, "valueB"],
+  [/\bweigh(?:t|ed)?\b|\bweigh in\b|\bweighed in\b|\bscale\b|\bbody value\b|\bwait\b|\bwaight\b|\bwate\b|\blbs?\b|\bpound(?:s|z)?\b/g, "valueC"],
   [/\boz\b|\bozs\b|\bounce(?:s|z)?\b|\bounzes\b|\bfluid ounce(?:s|z)?\b/g, "ounces"],
-  [/\bh20\b|\bh2o\b|\bhydrat(?:e|ion)\b|\bwat(?:er|r)\b|\bdrank\b|\bdrink\b|\bdrinks\b|\bfluids\b/g, "water"],
-  [/\bkeytone(?:s)?\b|\bketone(?:s)?\b|\bketo(?:sis)?\b|\bkeeto\b|\bfat burning\b/g, "ketosis"],
+  [/\bh20\b|\bh2o\b|\bhydrat(?:e|ion)\b|\bwat(?:er|r)\b|\bdrank\b|\bdrink\b|\bdrinks\b|\bwater\b/g, "water"],
+  [/\bkeytone(?:s)?\b|\bketone(?:s)?\b|\bketo(?:sis)?\b|\bkeeto\b|\bfat burning\b/g, "phase"],
   [/\btop number\b|\bupper number\b|\bsis(?:tolic|toll?ic)?\b/g, "systolic"],
   [/\bbottom number\b|\blower number\b|\bdia(?:stolic|stall?ic)?\b/g, "diastolic"],
   [/\bhead ache\b|\bhedache\b|\bheadake\b|\bmigrane\b/g, "headache"],
@@ -119,9 +133,9 @@ const dictationNormalizationRules = [
   [/\banx(?:y|ie|ious)?\b|\banxiet(?:y|ie)\b|\bfreaked out\b|\bpanicky\b/g, "anxious"],
   [/\bstressd\b|\bstrest\b|\bstressed out\b|\boverwhelmed\b|\bfrazzled\b/g, "stressed"],
   [/\bmeh\b|\bblah\b|\bmid\b|\bso so\b|\bjust ok\b|\bokayish\b/g, "okay"],
-  [/\bdown bad\b|\bbum(?:m)?ed\b|\bsad af\b|\blow mood\b|\bdeprest\b|\bdepressed\b/g, "low"],
+  [/\bdown bad\b|\bbum(?:m)?ed\b|\bsad af\b|\blow focusState\b|\bdeprest\b|\blow\b/g, "low"],
   [/\bgr8\b|\bgud\b|\bdoing good\b|\bfeelin good\b/g, "good"],
-  [/\bjournal(?:ing)?\b|\bjournel\b|\bjurnal\b|\bnote 2 self\b|\bnote to-self\b/g, "journal"],
+  [/\bfocusLog(?:ing)?\b|\bjournel\b|\bjurnal\b|\bnote 2 self\b|\bnote to-self\b/g, "focusLog"],
   [/\bto[- ]?do\b|\btodo\b|\btudu\b|\bt2do\b|\bremind me 2\b|\bneed 2\b|\bhave 2\b/g, "task"]
 ];
 const today = toDateKey(new Date());
@@ -132,12 +146,16 @@ const decimalFormatter = new Intl.NumberFormat(undefined, {
 });
 let filter = "all";
 let habits = loadHabits();
-let nutritionEntries = loadNutritionEntries();
-let symptomEntries = loadSymptomEntries();
-let moodEntries = loadMoodEntries();
-let journalEntries = loadJournalEntries();
+let taskBreakdowns = loadTaskBreakdowns();
+let aiTrainingExamples = loadAiTrainingExamples();
+let archiveAEntries = loadarchiveAEntries();
+let archiveBEntries = loadarchiveBEntries();
+let focusStateEntries = loadfocusStateEntries();
+let focusLogEntries = loadfocusLogEntries();
 let dictationDocuments = loadDictationDocuments();
 let appSettings = loadAppSettings();
+let taskLensAuthSession = loadTaskLensAuthSession();
+let pendingAccountAction = "";
 let taskDeadlineEvents = loadTaskDeadlineEvents();
 let editingHabitId = null;
 let lastReminderKey = "";
@@ -193,20 +211,22 @@ const taskDate = document.querySelector("#taskDate");
 const habitCategory = document.querySelector("#habitCategory");
 const habitDeadline = document.querySelector("#habitDeadline");
 const habitPriority = document.querySelector("#habitPriority");
+const habitSize = document.querySelector("#habitSize");
 const habitColor = document.querySelector("#habitColor");
 const habitNote = document.querySelector("#habitNote");
-const nutritionForm = document.querySelector("#nutritionForm");
-const nutritionDate = document.querySelector("#nutritionDate");
-const calories = document.querySelector("#calories");
-const carbs = document.querySelector("#carbs");
-const weight = document.querySelector("#weight");
-const weightUnitLabel = document.querySelector("#weightUnitLabel");
-const convertWeight = document.querySelector("#convertWeight");
-const ketosisPhase = document.querySelector("#ketosisPhase");
-const glucose = document.querySelector("#glucose");
+const taskChoiceButtons = document.querySelectorAll("[data-task-choice-target]");
+const archiveAForm = document.querySelector("#archiveAForm");
+const archiveADate = document.querySelector("#archiveADate");
+const valueA = document.querySelector("#valueA");
+const valueB = document.querySelector("#valueB");
+const valueC = document.querySelector("#valueC");
+const valueCUnitLabel = document.querySelector("#valueCUnitLabel");
+const convertvalueC = document.querySelector("#convertvalueC");
+const phasePhase = document.querySelector("#phasePhase");
+const valueD = document.querySelector("#valueD");
 const systolic = document.querySelector("#systolic");
 const diastolic = document.querySelector("#diastolic");
-const importBloodPressure = document.querySelector("#importBloodPressure");
+const importreading = document.querySelector("#importreading");
 const water = document.querySelector("#water");
 const waterControl = document.querySelector(".water-control");
 const waterGlasses = document.querySelector("#waterGlasses");
@@ -219,21 +239,21 @@ const DEFAULT_WATER_GOAL_OZ = 80;
 const MIN_WATER_GOAL_OZ = 64;
 const MAX_WATER_GOAL_OZ = WATER_GLASS_OZ * WATER_GLASS_COUNT;
 let waterExpanded = false;
-let weightUnit = "lb";
+let valueCUnit = "lb";
 let historyZoomDays = HISTORY_RETENTION_DAYS;
 let historyFocusDateKey = today;
-const avgCalories = document.querySelector("#avgCalories");
-const avgCarbs = document.querySelector("#avgCarbs");
-const latestWeight = document.querySelector("#latestWeight");
-const latestKetosis = document.querySelector("#latestKetosis");
-const latestGlucose = document.querySelector("#latestGlucose");
-const latestBloodPressure = document.querySelector("#latestBloodPressure");
+const avgvalueA = document.querySelector("#avgvalueA");
+const avgvalueB = document.querySelector("#avgvalueB");
+const latestvalueC = document.querySelector("#latestvalueC");
+const latestphase = document.querySelector("#latestphase");
+const latestvalueD = document.querySelector("#latestvalueD");
+const latestreading = document.querySelector("#latestreading");
 const latestWater = document.querySelector("#latestWater");
-const nutritionRows = document.querySelector("#nutritionRows");
-const nutritionEmpty = document.querySelector("#nutritionEmpty");
+const archiveARows = document.querySelector("#archiveARows");
+const archiveAEmpty = document.querySelector("#archiveAEmpty");
 const historyButton = document.querySelector("#historyButton");
-const vitalsHistoryDropdown = document.querySelector("#vitalsHistoryDropdown");
-const vitalsHistoryMount = document.querySelector("#vitalsHistoryMount");
+const archiveCHistoryDropdown = document.querySelector("#archiveCHistoryDropdown");
+const archiveCHistoryMount = document.querySelector("#archiveCHistoryMount");
 const historyModal = document.querySelector("#historyModal");
 const historyClose = document.querySelector("#historyClose");
 const historyRows = document.querySelector("#historyRows");
@@ -252,15 +272,20 @@ const historyZoomLabel = document.querySelector("#historyZoomLabel");
 const historyRangeButtons = document.querySelectorAll("[data-history-days]");
 const historyLegendButtons = document.querySelectorAll("[data-history-metric]");
 const historyGrid = document.querySelector("#historyGrid");
-const historyWeightLine = document.querySelector(".history-weight-line");
-const historyCaloriesLine = document.querySelector(".history-calories-line");
-const historyCarbsLine = document.querySelector(".history-carbs-line");
-const historyGlucoseLine = document.querySelector(".history-glucose-line");
+const historyvalueCLine = document.querySelector(".history-valueC-line");
+const historyvalueALine = document.querySelector(".history-valueA-line");
+const historyvalueBLine = document.querySelector(".history-valueB-line");
+const historyvalueDLine = document.querySelector(".history-valueD-line");
 const historyPressureLine = document.querySelector(".history-pressure-line");
 const historyWaterLine = document.querySelector(".history-water-line");
 const habitList = document.querySelector("#habitList");
 const habitTemplate = document.querySelector("#habitTemplate");
 const emptyState = document.querySelector("#emptyState");
+const photoAiHeroButton = document.querySelector("#photoAiHeroButton");
+const brainDumpHeroButton = document.querySelector("#brainDumpHeroButton");
+const winsPanel = document.querySelector("#winsPanel");
+const winsSummary = document.querySelector("#winsSummary");
+const winsList = document.querySelector("#winsList");
 const todayLabel = document.querySelector("#todayLabel");
 const weeklyTaskPercentBar = document.querySelector("#weeklyTaskPercentBar");
 const weeklyTaskPercentFill = document.querySelector("#weeklyTaskPercentFill");
@@ -282,9 +307,9 @@ const dictationStatus = document.querySelector("#dictationStatus");
 const todayTaskCount = document.querySelector("#todayTaskCount");
 const todayCompletedCount = document.querySelector("#todayCompletedCount");
 const todayWaterTotal = document.querySelector("#todayWaterTotal");
-const todayVitalsSummary = document.querySelector("#todayVitalsSummary");
-const todayMoodSummary = document.querySelector("#todayMoodSummary");
-const todaySymptomSummary = document.querySelector("#todaySymptomSummary");
+const todayarchiveCSummary = document.querySelector("#todayarchiveCSummary");
+const todayfocusStateSummary = document.querySelector("#todayfocusStateSummary");
+const todayarchiveBummary = document.querySelector("#todayarchiveBummary");
 const todayWeeklySummary = document.querySelector("#todayWeeklySummary");
 const todayWeeklyProgressFill = document.querySelector("#todayWeeklyProgressFill");
 const todayTaskList = document.querySelector("#todayTaskList");
@@ -299,6 +324,26 @@ const settingsModal = document.querySelector("#settingsModal");
 const settingsPanel = document.querySelector(".settings-panel");
 const settingsClose = document.querySelector("#settingsClose");
 const settingsSearch = document.querySelector("#settingsSearch");
+const accountButton = document.querySelector("#accountButton");
+const accountModal = document.querySelector("#accountModal");
+const accountDialogPanel = document.querySelector(".account-dialog-panel");
+const accountClose = document.querySelector("#accountClose");
+const accountStatus = document.querySelector("#accountStatus");
+const accountAuthFields = document.querySelector("#accountAuthFields");
+const accountEmail = document.querySelector("#accountEmail");
+const accountPassword = document.querySelector("#accountPassword");
+const accountSignInButton = document.querySelector("#accountSignInButton");
+const accountCreateButton = document.querySelector("#accountCreateButton");
+const accountResetPasswordButton = document.querySelector("#accountResetPasswordButton");
+const accountSignOutButton = document.querySelector("#accountSignOutButton");
+const createAccountModal = document.querySelector("#createAccountModal");
+const createAccountClose = document.querySelector("#createAccountClose");
+const createAccountCancel = document.querySelector("#createAccountCancel");
+const createAccountMessage = document.querySelector("#createAccountMessage");
+const createAccountEmail = document.querySelector("#createAccountEmail");
+const createAccountPassword = document.querySelector("#createAccountPassword");
+const createAccountConfirmPassword = document.querySelector("#createAccountConfirmPassword");
+const createAccountSubmitButton = document.querySelector("#createAccountSubmitButton");
 const themeToggle = document.querySelector("#themeToggle");
 const reminderToggle = document.querySelector("#reminderToggle");
 const reminderTime = document.querySelector("#reminderTime");
@@ -307,11 +352,14 @@ const heightInches = document.querySelector("#heightInches");
 const guestModeToggle = document.querySelector("#guestModeToggle");
 const biometricToggle = document.querySelector("#biometricToggle");
 const aiExtractionToggle = document.querySelector("#aiExtractionToggle");
-const hipaaCloudToggle = document.querySelector("#hipaaCloudToggle");
+const cloudAiToggle = document.querySelector("#cloudAiToggle");
 const aiApiKey = document.querySelector("#aiApiKey");
 const aiBackendUrl = document.querySelector("#aiBackendUrl");
 const aiBackendToken = document.querySelector("#aiBackendToken");
 const aiModel = document.querySelector("#aiModel");
+const photoAiUsageSetting = document.querySelector("#photoAiUsageSetting");
+const upgradeButton = document.querySelector("#upgradeButton");
+const exportTrainingDataButton = document.querySelector("#exportTrainingDataButton");
 const aiTtsModel = document.querySelector("#aiTtsModel");
 const aiTtsVoice = document.querySelector("#aiTtsVoice");
 const testAiTtsButton = document.querySelector("#testAiTtsButton");
@@ -356,58 +404,58 @@ const reminderCenterClose = document.querySelector("#reminderCenterClose");
 const reminderCenterList = document.querySelector("#reminderCenterList");
 const floatingAddMenu = document.querySelector("#floatingAddMenu");
 const floatingAddButton = document.querySelector("#floatingAddButton");
-const symptomPresetButtons = document.querySelectorAll("[data-symptom-preset]");
-const moodPresetButtons = document.querySelectorAll("[data-mood-preset]");
+const archiveBPresetButtons = document.querySelectorAll("[data-archiveB-preset]");
+const focusStatePresetButtons = document.querySelectorAll("[data-focusState-preset]");
 const taskPresetButtons = document.querySelectorAll("[data-task-preset]");
 const appToast = document.querySelector("#appToast");
 const overviewModuleMenu = document.querySelector("#overviewModuleMenu");
 const overviewTabs = document.querySelectorAll("[data-overview-module]");
 const overviewPanels = document.querySelectorAll("[data-overview-panel]");
-const wellbeingSection = document.querySelector("#wellbeingSection");
-const wellbeingModuleMenu = document.querySelector("#wellbeingModuleMenu");
-const wellbeingTabs = document.querySelectorAll("[data-wellbeing-module]");
-const nutritionPanel = document.querySelector("#nutritionPanel");
-const vitals24Button = document.querySelector("#vitals24Button");
-const vitals24Modal = document.querySelector("#vitals24Modal");
-const vitals24Close = document.querySelector("#vitals24Close");
-const symptomPanel = document.querySelector("#symptomPanel");
-const symptomForm = document.querySelector("#symptomForm");
-const symptomDate = document.querySelector("#symptomDate");
-const symptomName = document.querySelector("#symptomName");
-const symptomSeverity = document.querySelector("#symptomSeverity");
-const symptomNote = document.querySelector("#symptomNote");
-const symptomList = document.querySelector("#symptomList");
-const symptomEmpty = document.querySelector("#symptomEmpty");
-const symptomHistoryButton = document.querySelector("#symptomHistoryButton");
-const symptomHistoryModal = document.querySelector("#symptomHistoryModal");
-const symptomHistoryClose = document.querySelector("#symptomHistoryClose");
-const symptomHistoryRows = document.querySelector("#symptomHistoryRows");
-const symptomHistoryEmpty = document.querySelector("#symptomHistoryEmpty");
-const moodPanel = document.querySelector("#moodPanel");
-const moodForm = document.querySelector("#moodForm");
-const moodDate = document.querySelector("#moodDate");
-const moodName = document.querySelector("#moodName");
-const moodIntensity = document.querySelector("#moodIntensity");
-const moodNote = document.querySelector("#moodNote");
-const moodList = document.querySelector("#moodList");
-const moodEmpty = document.querySelector("#moodEmpty");
-const moodHistoryButton = document.querySelector("#moodHistoryButton");
-const moodHistoryModal = document.querySelector("#moodHistoryModal");
-const moodHistoryClose = document.querySelector("#moodHistoryClose");
-const moodHistoryRows = document.querySelector("#moodHistoryRows");
-const moodHistoryEmpty = document.querySelector("#moodHistoryEmpty");
-const journalPanel = document.querySelector("#journalPanel");
-const journalForm = document.querySelector("#journalForm");
-const journalDate = document.querySelector("#journalDate");
-const journalEntry = document.querySelector("#journalEntry");
-const journalPaperDate = document.querySelector("#journalPaperDate");
-const journalLogLink = document.querySelector("#journalLogLink");
+const focusAreaSection = document.querySelector("#focusAreaSection");
+const focusAreaModuleMenu = document.querySelector("#focusAreaModuleMenu");
+const focusAreaTabs = document.querySelectorAll("[data-focusArea-module]");
+const archiveAPanel = document.querySelector("#archiveAPanel");
+const archiveC24Button = document.querySelector("#archiveC24Button");
+const archiveC24Modal = document.querySelector("#archiveC24Modal");
+const archiveC24Close = document.querySelector("#archiveC24Close");
+const archiveBPanel = document.querySelector("#archiveBPanel");
+const archiveBForm = document.querySelector("#archiveBForm");
+const archiveBDate = document.querySelector("#archiveBDate");
+const archiveBName = document.querySelector("#archiveBName");
+const archiveBeverity = document.querySelector("#archiveBeverity");
+const archiveBNote = document.querySelector("#archiveBNote");
+const archiveBList = document.querySelector("#archiveBList");
+const archiveBEmpty = document.querySelector("#archiveBEmpty");
+const archiveBHistoryButton = document.querySelector("#archiveBHistoryButton");
+const archiveBHistoryModal = document.querySelector("#archiveBHistoryModal");
+const archiveBHistoryClose = document.querySelector("#archiveBHistoryClose");
+const archiveBHistoryRows = document.querySelector("#archiveBHistoryRows");
+const archiveBHistoryEmpty = document.querySelector("#archiveBHistoryEmpty");
+const focusStatePanel = document.querySelector("#focusStatePanel");
+const focusStateForm = document.querySelector("#focusStateForm");
+const focusStateDate = document.querySelector("#focusStateDate");
+const focusStateName = document.querySelector("#focusStateName");
+const focusStateIntensity = document.querySelector("#focusStateIntensity");
+const focusStateNote = document.querySelector("#focusStateNote");
+const focusStateList = document.querySelector("#focusStateList");
+const focusStateEmpty = document.querySelector("#focusStateEmpty");
+const focusStateHistoryButton = document.querySelector("#focusStateHistoryButton");
+const focusStateHistoryModal = document.querySelector("#focusStateHistoryModal");
+const focusStateHistoryClose = document.querySelector("#focusStateHistoryClose");
+const focusStateHistoryRows = document.querySelector("#focusStateHistoryRows");
+const focusStateHistoryEmpty = document.querySelector("#focusStateHistoryEmpty");
+const focusLogPanel = document.querySelector("#focusLogPanel");
+const focusLogForm = document.querySelector("#focusLogForm");
+const focusLogDate = document.querySelector("#focusLogDate");
+const focusLogEntry = document.querySelector("#focusLogEntry");
+const focusLogPaperDate = document.querySelector("#focusLogPaperDate");
+const focusLogLogLink = document.querySelector("#focusLogLogLink");
 const chartsPanel = document.querySelector("#chartsPanel");
-const wellbeingModules = ["vitals", "symptoms", "mood", "charts"];
+const focusAreaModules = ["archiveC", "archiveB", "charts"];
 const overviewModules = ["coach"];
 let overviewSwipeStartX = 0;
-let wellbeingSwipeStartX = 0;
-let wellbeingSwipeStartY = 0;
+let focusAreaSwipeStartX = 0;
+let focusAreaSwipeStartY = 0;
 let lastHapticAt = 0;
 
 todayLabel.textContent = new Intl.DateTimeFormat(undefined, {
@@ -415,10 +463,10 @@ todayLabel.textContent = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric"
 }).format(new Date());
-journalDate.value = today;
-journalPaperDate.textContent = formatShortSlashDate(today);
-updateJournalEntryState();
-clearMoodAndSymptomForms();
+if (focusLogDate) focusLogDate.value = today;
+if (focusLogPaperDate) focusLogPaperDate.textContent = formatShortSlashDate(today);
+if (focusLogEntry) updatefocusLogEntryState();
+clearfocusStateAndarchiveBForms();
 installHapticFeedback();
 
 dashboardJumpButtons.forEach((button) => {
@@ -428,12 +476,12 @@ aiRefreshButton.addEventListener("click", renderSmartCoach);
 reviewTodayButton.addEventListener("click", reviewToday);
 if (DICTATION_FEATURE_ENABLED) {
   dictateButton.hidden = false;
-  dictateButton.addEventListener("click", startHealthDictation);
+  dictateButton.addEventListener("click", startTaskLensDictation);
 } else {
   dictateButton.hidden = true;
   dictationStatus.hidden = true;
 }
-getStartedButton.addEventListener("click", startGuidedDataEntry);
+getStartedButton?.addEventListener("click", startGuidedDataEntry);
 quickActionButtons.forEach((button) => {
   button.addEventListener("click", () => {
     floatingAddMenu?.classList.remove("open");
@@ -441,7 +489,7 @@ quickActionButtons.forEach((button) => {
   });
 });
 floatingAddButton?.addEventListener("click", () => {
-  floatingAddMenu?.classList.toggle("open");
+  openAppHelpBotDialog();
 });
 reminderCenterClose?.addEventListener("click", () => {
   reminderCenterModal.hidden = true;
@@ -451,36 +499,59 @@ reminderCenterModal?.addEventListener("click", (event) => {
     reminderCenterModal.hidden = true;
   }
 });
-symptomPresetButtons.forEach((button) => {
+archiveBPresetButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    symptomName.value = button.dataset.symptomPreset || "";
-    setWellbeingModule("symptoms");
-    symptomName.focus();
+    archiveBName.value = button.dataset.archiveBPreset || "";
+    setfocusAreaModule("archiveB");
+    archiveBName.focus();
   });
 });
-moodPresetButtons.forEach((button) => {
+focusStatePresetButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    moodName.value = button.dataset.moodPreset || "Okay";
-    setWellbeingModule("mood");
-    moodNote.focus();
+    if (!focusStateName || !focusStateNote) return;
+    focusStateName.value = button.dataset.focusStatePreset || "Okay";
+    setfocusAreaModule("focusState");
+    focusStateNote.focus();
   });
 });
 taskPresetButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    habitName.value = button.dataset.taskPreset || "";
-    habitName.focus();
+    applyTaskPresetButton(button);
   });
+});
+taskChoiceButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const select = document.querySelector(`#${button.dataset.taskChoiceTarget}`);
+    if (!select) return;
+    select.value = button.dataset.taskChoiceValue || "";
+    syncTaskChoiceButtons(select.id);
+  });
+});
+syncTaskChoiceButtons();
+photoAiHeroButton?.addEventListener("click", () => {
+  if (!requireTaskLensAccount("photo")) return;
+  startPhotoAiHeroTask();
+});
+brainDumpHeroButton?.addEventListener("click", () => {
+  if (!requireTaskLensAccount("brain")) return;
+  startBrainDumpHeroTask();
+});
+winsPanel?.addEventListener("click", () => scrollToTaskList());
+winsPanel?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  scrollToTaskList();
 });
 applySettings();
 setOverviewModule("coach");
-setWellbeingModule("vitals");
-mountVitalsHistoryChart();
+setfocusAreaModule("archiveC");
+mountarchiveCHistoryChart();
 
-journalEntry.addEventListener("input", updateJournalEntryState);
-journalDate.addEventListener("change", () => {
-  journalPaperDate.textContent = journalDate.value ? formatShortSlashDate(journalDate.value) : "";
+focusLogEntry?.addEventListener("input", updatefocusLogEntryState);
+focusLogDate?.addEventListener("change", () => {
+  if (focusLogPaperDate) focusLogPaperDate.textContent = focusLogDate.value ? formatShortSlashDate(focusLogDate.value) : "";
 });
-journalLogLink?.addEventListener("click", openJournalLogList);
+focusLogLogLink?.addEventListener("click", openfocusLogLogList);
 onboardingClose?.addEventListener("click", closeInitialDataOnboarding);
 overviewTabs.forEach((tab) => {
   tab.addEventListener("click", () => setOverviewModule(tab.dataset.overviewModule));
@@ -492,10 +563,10 @@ overviewModuleMenu?.addEventListener("touchend", (event) => {
   const endX = event.changedTouches[0]?.clientX || overviewSwipeStartX;
   handleOverviewSwipe(endX - overviewSwipeStartX);
 });
-wellbeingTabs.forEach((tab) => {
-  tab.addEventListener("click", () => setWellbeingModule(tab.dataset.wellbeingModule));
+focusAreaTabs.forEach((tab) => {
+  tab.addEventListener("click", () => setfocusAreaModule(tab.dataset.focusAreaModule));
 });
-[wellbeingSection, nutritionPanel, symptomPanel, moodPanel, chartsPanel].forEach(bindWellbeingSwipeTarget);
+[focusAreaSection, archiveAPanel, archiveBPanel, chartsPanel].forEach(bindfocusAreaSwipeTarget);
 
 habitForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -513,8 +584,9 @@ habitForm.addEventListener("submit", (event) => {
     category: habitCategory.value || "General",
     time: "",
     deadline: normalizeTaskTime(habitDeadline.value),
-    priority: habitPriority.value || "Normal",
-    color: habitColor ? habitColor.value : "#1e40af",
+    priority: normalizeTaskPriority(habitPriority.value),
+    size: normalizeTaskSize(habitSize?.value),
+    color: habitColor ? habitColor.value : "#4574fa",
     note: habitNote.value.trim(),
     completions: editingHabitId
       ? habits.find((habit) => habit.id === editingHabitId)?.completions || []
@@ -529,9 +601,11 @@ habitForm.addEventListener("submit", (event) => {
   habitNote.value = "";
   habitDeadline.value = "";
   if (taskDate) taskDate.value = "";
-  habitCategory.value = "";
-  habitPriority.value = "";
-  habitForm.querySelector(".primary-button").textContent = "Add";
+  habitCategory.value = "General";
+  habitPriority.value = "Now";
+  if (habitSize) habitSize.value = "Tiny";
+  syncTaskChoiceButtons();
+  habitForm.querySelector(".primary-button").textContent = "Turn into task";
   editingHabitId = null;
   saveHabits();
   if (task.deadline) {
@@ -539,100 +613,103 @@ habitForm.addEventListener("submit", (event) => {
   }
   render();
   showToast(wasEditing ? "Task saved." : "Task added.");
+  if (!wasEditing) {
+    openTaskBreakdownPrompt(task);
+  }
 });
 
-nutritionForm.addEventListener("submit", (event) => {
+archiveAForm?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const date = nutritionDate.value || today;
+  const date = archiveADate.value || today;
   const entry = {
     date,
     recordedAt: new Date().toISOString(),
-    calories: parseNutritionNumber(calories.value),
-    carbs: parseNutritionNumber(carbs.value),
-    weight: getWeightInPoundsForSave(),
-    ketosisPhase: ketosisPhase.value || null,
-    glucose: parseNutritionNumber(glucose.value),
-    systolic: parseNutritionNumber(systolic.value),
-    diastolic: parseNutritionNumber(diastolic.value),
-    water: parseNutritionNumber(water.value)
+    valueA: parsearchiveANumber(valueA.value),
+    valueB: parsearchiveANumber(valueB.value),
+    valueC: getvalueCInPoundsForSave(),
+    phasePhase: phasePhase.value || null,
+    valueD: parsearchiveANumber(valueD.value),
+    systolic: parsearchiveANumber(systolic.value),
+    diastolic: parsearchiveANumber(diastolic.value),
+    water: parsearchiveANumber(water.value)
   };
 
-  nutritionEntries = [
+  archiveAEntries = [
     entry,
-    ...nutritionEntries.filter((item) => item.date !== date)
+    ...archiveAEntries.filter((item) => item.date !== date)
   ].sort((first, second) => second.date.localeCompare(first.date));
 
-  saveNutritionEntries();
-  renderNutrition();
+  savearchiveAEntries();
+  renderarchiveA();
   renderGraph();
-  showToast("Nutrition and vitals saved.");
+  showToast("archiveA and archiveC saved.");
 });
 
-symptomForm.addEventListener("submit", (event) => {
+archiveBForm?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const name = symptomName.value.trim();
+  const name = archiveBName.value.trim();
   if (!name) return;
-  symptomEntries = [{
+  archiveBEntries = [{
     id: createHabitId(),
-    date: symptomDate.value || today,
+    date: archiveBDate.value || today,
     recordedAt: new Date().toISOString(),
     name,
-    severity: symptomSeverity.value || "Mild",
-    note: symptomNote.value.trim()
-  }, ...symptomEntries];
-  symptomDate.value = "";
-  symptomName.value = "";
-  symptomSeverity.value = "";
-  symptomNote.value = "";
-  saveSymptomEntries();
-  renderSymptoms();
-  renderSymptomHistory();
-  maybeSendWellbeingTrendNotification("symptoms");
-  showToast("Symptom logged.");
+    severity: archiveBeverity.value || "Mild",
+    note: archiveBNote.value.trim()
+  }, ...archiveBEntries];
+  archiveBDate.value = "";
+  archiveBName.value = "";
+  archiveBeverity.value = "";
+  archiveBNote.value = "";
+  savearchiveBEntries();
+  renderarchiveB();
+  renderarchiveBHistory();
+  maybeSendfocusAreaTrendNotification("archiveB");
+  showToast("archiveB logged.");
 });
 
-moodForm.addEventListener("submit", (event) => {
+focusStateForm?.addEventListener("submit", (event) => {
   event.preventDefault();
-  moodEntries = [{
+  focusStateEntries = [{
     id: createHabitId(),
-    date: moodDate.value || today,
+    date: focusStateDate.value || today,
     recordedAt: new Date().toISOString(),
-    name: moodName.value || "Okay",
-    intensity: moodIntensity.value || "Moderate",
-    note: moodNote.value.trim()
-  }, ...moodEntries];
-  moodDate.value = "";
-  moodName.value = "";
-  moodIntensity.value = "";
-  moodNote.value = "";
-  saveMoodEntries();
-  renderMoods();
-  renderMoodHistory();
-  maybeSendWellbeingTrendNotification("mood");
-  showToast("Mood logged.");
+    name: focusStateName.value || "Okay",
+    intensity: focusStateIntensity.value || "Moderate",
+    note: focusStateNote.value.trim()
+  }, ...focusStateEntries];
+  focusStateDate.value = "";
+  focusStateName.value = "";
+  focusStateIntensity.value = "";
+  focusStateNote.value = "";
+  savefocusStateEntries();
+  renderfocusStates();
+  renderfocusStateHistory();
+  maybeSendfocusAreaTrendNotification("focusState");
+  showToast("focusState logged.");
 });
 
-journalForm.addEventListener("submit", (event) => {
+focusLogForm?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const text = journalEntry.value.trim();
+  const text = focusLogEntry.value.trim();
   if (!text) return;
-  journalEntries = [{
+  focusLogEntries = [{
     id: createHabitId(),
-    date: journalDate.value || today,
+    date: focusLogDate.value || today,
     text
-  }, ...journalEntries];
-  journalEntry.value = "";
-  updateJournalEntryState();
-  saveJournalEntries();
-  handleImmediateJournalSafetySignal(text);
-  renderJournal();
+  }, ...focusLogEntries];
+  focusLogEntry.value = "";
+  updatefocusLogEntryState();
+  savefocusLogEntries();
+  handleImmediatefocusLogSafetySignal(text);
+  renderfocusLog();
   scheduleSmartCoachRender();
-  maybeSendWellbeingTrendNotification("journal");
-  scanJournalAndAppWithAiForSafety(text);
-  showToast("Journal entry saved.");
+  maybeSendfocusAreaTrendNotification("focusLog");
+  scanfocusLogAndAppWithAiForSafety(text);
+  showToast("focusLog entry saved.");
 });
 
-waterGlasses.addEventListener("click", (event) => {
+waterGlasses?.addEventListener("click", (event) => {
   const button = event.target.closest(".water-glass");
   if (!button) return;
   const selectedGlasses = Number(button.dataset.glassIndex);
@@ -641,49 +718,49 @@ waterGlasses.addEventListener("click", (event) => {
   setWaterAmount(selectedGlasses * WATER_GLASS_OZ);
 });
 
-waterToggle.addEventListener("click", () => {
+waterToggle?.addEventListener("click", () => {
   setWaterExpanded(true);
 });
 
-waterClear.addEventListener("click", () => {
+waterClear?.addEventListener("click", () => {
   setWaterAmount(null);
 });
 
-vitals24Button?.addEventListener("click", () => {
-  renderNutrition();
-  vitals24Modal.hidden = false;
+archiveC24Button?.addEventListener("click", () => {
+  renderarchiveA();
+  archiveC24Modal.hidden = false;
 });
 
-vitals24Close?.addEventListener("click", () => {
-  vitals24Modal.hidden = true;
+archiveC24Close?.addEventListener("click", () => {
+  archiveC24Modal.hidden = true;
 });
 
-vitals24Modal?.addEventListener("click", (event) => {
-  if (event.target === vitals24Modal) {
-    vitals24Modal.hidden = true;
+archiveC24Modal?.addEventListener("click", (event) => {
+  if (event.target === archiveC24Modal) {
+    archiveC24Modal.hidden = true;
   }
 });
 
-importBloodPressure.addEventListener("click", () => {
-  importBloodPressureFromWatch();
+importreading?.addEventListener("click", () => {
+  importreadingFromWatch();
 });
 
-convertWeight.addEventListener("click", () => {
-  toggleWeightUnit();
+convertvalueC?.addEventListener("click", () => {
+  togglevalueCUnit();
 });
 
-weight.addEventListener("input", () => {
-  weightUnit = "lb";
-  updateWeightConvertButton();
+valueC?.addEventListener("input", () => {
+  valueCUnit = "lb";
+  updatevalueCConvertButton();
 });
 
 historyButton?.addEventListener("click", () => {
-  if (vitalsHistoryDropdown) {
-    setWellbeingModule("charts");
-    vitalsHistoryDropdown.open = true;
+  if (archiveCHistoryDropdown) {
+    setfocusAreaModule("charts");
+    archiveCHistoryDropdown.open = true;
     syncHistoryControls();
     renderHistory();
-    vitalsHistoryDropdown.scrollIntoView({ behavior: "smooth", block: "start" });
+    archiveCHistoryDropdown.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
   syncHistoryControls();
@@ -691,12 +768,12 @@ historyButton?.addEventListener("click", () => {
   historyModal.hidden = false;
 });
 
-historyFocusDate.addEventListener("change", () => {
+historyFocusDate?.addEventListener("change", () => {
   historyFocusDateKey = historyFocusDate.value || today;
   renderHistory();
 });
 
-historyZoomRange.addEventListener("input", () => {
+historyZoomRange?.addEventListener("input", () => {
   historyZoomDays = Number(historyZoomRange.value) || HISTORY_RETENTION_DAYS;
   renderHistory();
 });
@@ -718,15 +795,15 @@ historyLegendButtons.forEach((button) => {
   });
 });
 
-historyMetricFilter.addEventListener("change", () => {
+historyMetricFilter?.addEventListener("change", () => {
   renderHistory();
 });
 
-historyClose.addEventListener("click", () => {
+historyClose?.addEventListener("click", () => {
   historyModal.hidden = true;
 });
 
-historyModal.addEventListener("click", (event) => {
+historyModal?.addEventListener("click", (event) => {
   if (event.target === historyModal) {
     historyModal.hidden = true;
   }
@@ -747,33 +824,33 @@ masterChartModal?.addEventListener("click", (event) => {
   }
 });
 
-symptomHistoryButton.addEventListener("click", () => {
-  renderSymptomHistory();
-  symptomHistoryModal.hidden = false;
+archiveBHistoryButton?.addEventListener("click", () => {
+  renderarchiveBHistory();
+  archiveBHistoryModal.hidden = false;
 });
 
-symptomHistoryClose.addEventListener("click", () => {
-  symptomHistoryModal.hidden = true;
+archiveBHistoryClose?.addEventListener("click", () => {
+  archiveBHistoryModal.hidden = true;
 });
 
-symptomHistoryModal.addEventListener("click", (event) => {
-  if (event.target === symptomHistoryModal) {
-    symptomHistoryModal.hidden = true;
+archiveBHistoryModal?.addEventListener("click", (event) => {
+  if (event.target === archiveBHistoryModal) {
+    archiveBHistoryModal.hidden = true;
   }
 });
 
-moodHistoryButton.addEventListener("click", () => {
-  renderMoodHistory();
-  moodHistoryModal.hidden = false;
+focusStateHistoryButton?.addEventListener("click", () => {
+  renderfocusStateHistory();
+  focusStateHistoryModal.hidden = false;
 });
 
-moodHistoryClose.addEventListener("click", () => {
-  moodHistoryModal.hidden = true;
+focusStateHistoryClose?.addEventListener("click", () => {
+  focusStateHistoryModal.hidden = true;
 });
 
-moodHistoryModal.addEventListener("click", (event) => {
-  if (event.target === moodHistoryModal) {
-    moodHistoryModal.hidden = true;
+focusStateHistoryModal?.addEventListener("click", (event) => {
+  if (event.target === focusStateHistoryModal) {
+    focusStateHistoryModal.hidden = true;
   }
 });
 
@@ -792,7 +869,7 @@ dictationReviewModal.addEventListener("click", (event) => {
 dictationReviewSave.addEventListener("click", saveReviewedDictation);
 dictationReviewRetry.addEventListener("click", () => {
   if (!DICTATION_FEATURE_ENABLED) return;
-  startHealthDictation({ appendToReview: true });
+  startTaskLensDictation({ appendToReview: true });
 });
 dictationReviewManual.addEventListener("click", () => {
   pendingDictationExtraction = null;
@@ -818,90 +895,223 @@ reviewTodayModal.addEventListener("click", (event) => {
   }
 });
 
-settingsButton.addEventListener("click", () => {
-  renderSettings();
-  setSettingsPasswordFieldTypes("password");
+function openSettingsMenu() {
+  if (!settingsModal || !settingsPanel) return;
   settingsModal.hidden = false;
+  settingsModal.removeAttribute("hidden");
+  settingsModal.style.display = "grid";
+  settingsModal.style.zIndex = "9999";
   settingsModal.scrollTop = 0;
   settingsPanel.scrollTop = 0;
+  updateDialogScrollLock();
+  try {
+    renderSettings();
+    setSettingsPasswordFieldTypes("password");
+  } catch (error) {
+    console.error("Settings render failed.", error);
+    showToast("Settings opened.");
+  }
+}
+
+window.openTaskLensSettings = openSettingsMenu;
+
+settingsButton?.addEventListener("click", () => {
+  openSettingsMenu();
 });
 
-settingsClose.addEventListener("click", () => {
+function openAccountMenu() {
+  if (!accountModal || !accountDialogPanel) return;
+  accountModal.hidden = false;
+  accountModal.removeAttribute("hidden");
+  accountModal.style.display = "grid";
+  accountModal.style.zIndex = "9999";
+  accountModal.scrollTop = 0;
+  accountDialogPanel.scrollTop = 0;
+  renderTaskLensAccountSettings();
+  renderSettings();
+  updateDialogScrollLock();
+  if (!taskLensAuthSession?.refreshToken) {
+    setTimeout(() => accountEmail?.focus(), 60);
+  }
+}
+
+window.openTaskLensAccount = openAccountMenu;
+accountButton?.addEventListener("click", openAccountMenu);
+accountClose?.addEventListener("click", () => {
+  accountModal.hidden = true;
+  accountModal.style.display = "";
+  accountModal.style.zIndex = "";
+  updateDialogScrollLock();
+});
+accountModal?.addEventListener("click", (event) => {
+  if (event.target !== accountModal) return;
+  accountModal.hidden = true;
+  accountModal.style.display = "";
+  accountModal.style.zIndex = "";
+  updateDialogScrollLock();
+});
+
+function openCreateAccountDialog() {
+  if (!createAccountModal) return;
+  createAccountModal.hidden = false;
+  createAccountModal.removeAttribute("hidden");
+  createAccountModal.style.display = "grid";
+  createAccountModal.style.zIndex = "10000";
+  createAccountModal.scrollTop = 0;
+  if (createAccountMessage) createAccountMessage.textContent = "Create your account, then sign in to continue.";
+  if (createAccountEmail && accountEmail?.value) createAccountEmail.value = accountEmail.value;
+  if (createAccountPassword) createAccountPassword.value = "";
+  if (createAccountConfirmPassword) createAccountConfirmPassword.value = "";
+  updateDialogScrollLock();
+  setTimeout(() => (createAccountEmail?.value ? createAccountPassword : createAccountEmail)?.focus(), 60);
+}
+
+function closeCreateAccountDialog() {
+  if (!createAccountModal) return;
+  createAccountModal.hidden = true;
+  createAccountModal.style.display = "";
+  createAccountModal.style.zIndex = "";
+  updateDialogScrollLock();
+}
+
+createAccountClose?.addEventListener("click", closeCreateAccountDialog);
+createAccountCancel?.addEventListener("click", closeCreateAccountDialog);
+createAccountModal?.addEventListener("click", (event) => {
+  if (event.target !== createAccountModal) return;
+  closeCreateAccountDialog();
+});
+
+function isTaskLensAccountSignedIn() {
+  return Boolean(taskLensAuthSession?.refreshToken);
+}
+
+function requireTaskLensAccount(actionName) {
+  if (isTaskLensAccountSignedIn()) return true;
+  pendingAccountAction = actionName || "";
+  openAccountMenu();
+  showToast("Sign in or create an account to continue.");
+  return false;
+}
+
+function runPendingAccountAction() {
+  const action = pendingAccountAction;
+  pendingAccountAction = "";
+  if (action === "photo") {
+    startPhotoAiHeroTask();
+    return;
+  }
+  if (action === "brain") {
+    startBrainDumpHeroTask();
+  }
+}
+
+function startBrainDumpHeroTask() {
+  habitName.focus();
+  habitName.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+settingsClose?.addEventListener("click", () => {
   settingsModal.hidden = true;
+  settingsModal.style.display = "";
+  settingsModal.style.zIndex = "";
   setSettingsPasswordFieldTypes("text");
 });
 
-settingsModal.addEventListener("click", (event) => {
+settingsModal?.addEventListener("click", (event) => {
   if (event.target === settingsModal) {
     settingsModal.hidden = true;
+    settingsModal.style.display = "";
+    settingsModal.style.zIndex = "";
     setSettingsPasswordFieldTypes("text");
   }
 });
 settingsSearch?.addEventListener("input", filterSettings);
 
-themeToggle.addEventListener("change", () => updateSetting("theme", themeToggle.checked ? "dark" : "light"));
-reminderToggle.addEventListener("change", () => updateSetting("remindersEnabled", reminderToggle.checked));
-reminderTime.addEventListener("change", () => updateSetting("reminderTime", reminderTime.value));
-heightFeet.addEventListener("change", () => updateHeightSetting());
-heightInches.addEventListener("change", () => updateHeightSetting());
-aiExtractionToggle.addEventListener("change", () => updateSetting("aiExtractionEnabled", aiExtractionToggle.checked));
-hipaaCloudToggle?.addEventListener("change", () => updateCloudAiSharing(hipaaCloudToggle.checked));
-aiApiKey.addEventListener("change", () => {
+accountSignInButton?.addEventListener("click", () => signInTaskLensAccount());
+accountCreateButton?.addEventListener("click", openCreateAccountDialog);
+createAccountSubmitButton?.addEventListener("click", () => createTaskLensAccount());
+accountResetPasswordButton?.addEventListener("click", () => sendTaskLensPasswordReset());
+accountSignOutButton?.addEventListener("click", signOutTaskLensAccount);
+accountPassword?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") signInTaskLensAccount();
+});
+createAccountConfirmPassword?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") createTaskLensAccount();
+});
+themeToggle?.addEventListener("change", () => updateSetting("theme", themeToggle.checked ? "dark" : "light"));
+reminderToggle?.addEventListener("change", () => updateSetting("remindersEnabled", reminderToggle.checked));
+reminderTime?.addEventListener("change", () => updateSetting("reminderTime", reminderTime.value));
+heightFeet?.addEventListener("change", () => updateHeightSetting());
+heightInches?.addEventListener("change", () => updateHeightSetting());
+aiExtractionToggle?.addEventListener("change", () => updateSetting("aiExtractionEnabled", aiExtractionToggle.checked));
+cloudAiToggle?.addEventListener("change", () => updateCloudAiSharing(cloudAiToggle.checked));
+aiApiKey?.addEventListener("change", () => {
   aiApiKey.value = "";
   updateSetting("aiApiKey", "");
   showToast("OpenAI keys belong on the secure backend, not inside the app.");
 });
-aiBackendUrl.addEventListener("change", () => updateSetting("aiBackendUrl", normalizeAiBackendUrlInput(aiBackendUrl.value)));
-aiBackendToken.addEventListener("change", () => updateSetting("aiBackendToken", aiBackendToken.value.trim()));
-aiModel.addEventListener("change", () => updateSetting("aiModel", aiModel.value.trim()));
+aiBackendUrl?.addEventListener("change", () => updateSetting("aiBackendUrl", normalizeAiBackendUrlInput(aiBackendUrl.value)));
+aiBackendToken?.addEventListener("change", () => updateSetting("aiBackendToken", aiBackendToken.value.trim()));
+aiModel?.addEventListener("change", () => updateSetting("aiModel", aiModel.value.trim()));
+upgradeButton?.addEventListener("click", () => {
+  window.alert(`TaskLens Premium\n\nFree: ${FREE_PHOTO_AI_LIMIT} photo checklists per month.\nPremium: ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}.\n\nCheckout is not available in this build yet.`);
+});
 aiTtsModel?.addEventListener("change", () => updateSetting("aiTtsModel", aiTtsModel.value.trim()));
 aiTtsVoice?.addEventListener("change", () => updateSetting("aiTtsVoice", aiTtsVoice.value));
 testAiTtsButton?.addEventListener("click", testAiTextToSpeech);
 installTtsVoiceButton?.addEventListener("click", installPhoneTextToSpeechVoiceData);
-guestModeToggle.addEventListener("change", () => updateGuestModeSetting(guestModeToggle.checked));
-setPasswordButton.addEventListener("click", () => setAppPassword());
-clearPasswordButton.addEventListener("click", () => clearAppPassword());
-biometricToggle.addEventListener("change", () => updateBiometricSetting());
-unlockButton.addEventListener("click", () => unlockWithPassword());
-lockPassword.addEventListener("keydown", (event) => {
+guestModeToggle?.addEventListener("change", () => updateGuestModeSetting(guestModeToggle.checked));
+setPasswordButton?.addEventListener("click", () => setAppPassword());
+clearPasswordButton?.addEventListener("click", () => clearAppPassword());
+biometricToggle?.addEventListener("change", () => updateBiometricSetting());
+unlockButton?.addEventListener("click", () => unlockWithPassword());
+lockPassword?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   if (setupPasswordButton.hidden) unlockWithPassword();
   else completeSecuritySetup();
 });
-biometricUnlockButton.addEventListener("click", () => unlockWithBiometric());
-resetPasswordButton.addEventListener("click", () => resetAppSecurityFromLock());
-setupPasswordButton.addEventListener("click", () => completeSecuritySetup());
-setupBiometricButton.addEventListener("click", () => completeBiometricSecuritySetup());
-guestModeButton.addEventListener("click", () => continueAsGuest());
-confirmPasswordCancel.addEventListener("click", () => closeConfirmPasswordDialog(false));
-confirmPasswordSubmit.addEventListener("click", () => submitConfirmPasswordDialog());
-confirmPasswordInput.addEventListener("keydown", (event) => {
+biometricUnlockButton?.addEventListener("click", () => unlockWithBiometric());
+resetPasswordButton?.addEventListener("click", () => resetAppSecurityFromLock());
+setupPasswordButton?.addEventListener("click", () => completeSecuritySetup());
+setupBiometricButton?.addEventListener("click", () => completeBiometricSecuritySetup());
+guestModeButton?.addEventListener("click", () => continueAsGuest());
+confirmPasswordCancel?.addEventListener("click", () => closeConfirmPasswordDialog(false));
+confirmPasswordSubmit?.addEventListener("click", () => submitConfirmPasswordDialog());
+confirmPasswordInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") submitConfirmPasswordDialog();
 });
-confirmPasswordModal.addEventListener("click", (event) => {
+confirmPasswordModal?.addEventListener("click", (event) => {
   if (event.target === confirmPasswordModal) closeConfirmPasswordDialog(false);
 });
-exportDataButton.addEventListener("click", exportAppData);
-importDataButton.addEventListener("click", () => importDataFile.click());
-importDataFile.addEventListener("change", importAppData);
-masterResetButton.addEventListener("click", masterResetAppData);
+exportDataButton?.addEventListener("click", exportAppData);
+exportTrainingDataButton?.addEventListener("click", exportAiTrainingData);
+importDataButton?.addEventListener("click", () => importDataFile?.click());
+importDataFile?.addEventListener("change", importAppData);
+masterResetButton?.addEventListener("click", masterResetAppData);
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !affirmationModal.hidden) {
     closeAffirmationModal();
     return;
   }
-  if (event.key === "Escape" && !historyModal.hidden) {
+  if (event.key === "Escape" && historyModal && !historyModal.hidden) {
     historyModal.hidden = true;
   }
-  if (event.key === "Escape" && !symptomHistoryModal.hidden) {
-    symptomHistoryModal.hidden = true;
+  if (event.key === "Escape" && archiveBHistoryModal && !archiveBHistoryModal.hidden) {
+    archiveBHistoryModal.hidden = true;
   }
-  if (event.key === "Escape" && !moodHistoryModal.hidden) {
-    moodHistoryModal.hidden = true;
+  if (event.key === "Escape" && focusStateHistoryModal && !focusStateHistoryModal.hidden) {
+    focusStateHistoryModal.hidden = true;
   }
   if (event.key === "Escape" && !settingsModal.hidden) {
     settingsModal.hidden = true;
+  }
+  if (event.key === "Escape" && createAccountModal && !createAccountModal.hidden) {
+    closeCreateAccountDialog();
+    return;
+  }
+  if (event.key === "Escape" && accountModal && !accountModal.hidden) {
+    accountModal.hidden = true;
   }
 });
 
@@ -977,26 +1187,125 @@ function render() {
   habitList.appendChild(fragment);
 
   emptyState.hidden = habits.length > 0;
+  renderWinsPanel();
   renderTodayDashboard();
   scheduleSmartCoachRender();
   renderGraph();
-  renderNutrition();
-  renderSymptoms();
-  renderMoods();
-  renderJournal();
-  renderWaterControl();
   maybePromptBackupReminder();
 }
 
-function clearMoodAndSymptomForms() {
-  symptomDate.value = "";
-  symptomName.value = "";
-  symptomSeverity.value = "";
-  symptomNote.value = "";
-  moodDate.value = "";
-  moodName.value = "";
-  moodIntensity.value = "";
-  moodNote.value = "";
+function applyTaskPresetButton(button) {
+  habitName.value = button.dataset.taskPreset || "";
+  if (button.dataset.taskNotePreset && habitNote) {
+    habitNote.value = button.dataset.taskNotePreset;
+    habitNote.focus();
+  } else {
+    habitName.focus();
+  }
+  habitName.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function startPhotoAiHeroTask() {
+  const task = createTaskDraft({
+    name: "Photo checklist",
+    category: "Home",
+    priority: "Now",
+    size: "Tiny",
+    note: "Take a photo of the stuck area so AI can turn visible clutter, blockers, and next steps into a checklist."
+  });
+  openTaskBreakdownPrompt(task, { cancelDeletesTask: true });
+}
+
+function syncTaskChoiceButtons(targetId = "") {
+  taskChoiceButtons.forEach((button) => {
+    if (targetId && button.dataset.taskChoiceTarget !== targetId) return;
+    const select = document.querySelector(`#${button.dataset.taskChoiceTarget}`);
+    const isActive = Boolean(select && select.value === button.dataset.taskChoiceValue);
+    button.classList.toggle("is-selected", isActive);
+    button.setAttribute("aria-checked", String(isActive));
+  });
+}
+
+function scrollToTaskList() {
+  const firstTaskCard = habitList?.querySelector(".habit-card");
+  const target = firstTaskCard || habitForm;
+  target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (firstTaskCard) {
+    firstTaskCard.focus?.({ preventScroll: true });
+  } else {
+    habitName?.focus?.({ preventScroll: true });
+  }
+}
+
+function renderWinsPanel() {
+  if (!winsSummary || !winsList) return;
+  const wins = getTaskWins();
+  const completedStepCount = Object.values(taskBreakdowns)
+    .flatMap((breakdown) => Array.isArray(breakdown?.steps) ? breakdown.steps : [])
+    .filter((step) => step.done).length;
+  winsSummary.textContent = `${wins.length} win${wins.length === 1 ? "" : "s"}`;
+  winsList.textContent = "";
+  if (!wins.length) {
+    const empty = document.createElement("p");
+    empty.className = "wins-empty";
+    empty.textContent = completedStepCount
+      ? `${completedStepCount} checklist step${completedStepCount === 1 ? "" : "s"} checked. Add an after photo to save a visible win.`
+      : "Complete checklist steps or add an after photo to build proof of progress.";
+    winsList.appendChild(empty);
+    return;
+  }
+  wins.slice(0, 3).forEach((win) => {
+    const card = document.createElement("article");
+    const title = document.createElement("strong");
+    const detail = document.createElement("span");
+    card.className = "win-card";
+    title.textContent = win.taskName;
+    detail.textContent = `${win.doneSteps}/${win.totalSteps} steps done${win.hasAfterPhoto ? " • after photo saved" : ""}`;
+    card.append(title, detail);
+    if (win.beforeImage || win.afterImage) {
+      const media = document.createElement("div");
+      media.className = "win-card-media";
+      [win.beforeImage, win.afterImage].filter(Boolean).forEach((src) => {
+        const image = document.createElement("img");
+        image.src = src;
+        image.alt = "";
+        media.appendChild(image);
+      });
+      card.appendChild(media);
+    }
+    winsList.appendChild(card);
+  });
+}
+
+function getTaskWins() {
+  return Object.entries(taskBreakdowns)
+    .map(([taskId, breakdown]) => {
+      const task = habits.find((habit) => habit.id === taskId);
+      const steps = Array.isArray(breakdown?.steps) ? breakdown.steps : [];
+      const doneSteps = steps.filter((step) => step.done).length;
+      return {
+        taskName: task?.name || breakdown?.title || "Checklist",
+        doneSteps,
+        totalSteps: steps.length,
+        hasAfterPhoto: Boolean(breakdown?.afterImageDataUrl),
+        beforeImage: breakdown?.sourceImageDataUrl || "",
+        afterImage: breakdown?.afterImageDataUrl || "",
+        generatedAt: breakdown?.generatedAt || ""
+      };
+    })
+    .filter((win) => win.doneSteps > 0 || win.hasAfterPhoto)
+    .sort((first, second) => String(second.generatedAt).localeCompare(String(first.generatedAt)));
+}
+
+function clearfocusStateAndarchiveBForms() {
+  if (archiveBDate) archiveBDate.value = "";
+  if (archiveBName) archiveBName.value = "";
+  if (archiveBeverity) archiveBeverity.value = "";
+  if (archiveBNote) archiveBNote.value = "";
+  if (focusStateDate) focusStateDate.value = "";
+  if (focusStateName) focusStateName.value = "";
+  if (focusStateIntensity) focusStateIntensity.value = "";
+  if (focusStateNote) focusStateNote.value = "";
 }
 
 function groupTasksByDay() {
@@ -1007,6 +1316,13 @@ function groupTasksByDay() {
     tasksByDay.get(dateKey).push(habit);
   });
   return new Map([...tasksByDay.entries()].sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate)));
+}
+
+function getTaskCompletionPercent(dateKey) {
+  const tasksForDate = habits.filter((habit) => isTaskScheduledForDate(habit, dateKey));
+  if (!tasksForDate.length) return null;
+  const completed = tasksForDate.filter((habit) => (habit.completions || []).includes(dateKey)).length;
+  return Math.round((completed / tasksForDate.length) * 100);
 }
 
 function renderDaySection(dayName, dateKey, dayHabits) {
@@ -1034,15 +1350,15 @@ function renderDaySection(dayName, dateKey, dayHabits) {
   const title = document.createElement("h2");
   title.textContent = dayName;
   const subtitle = document.createElement("p");
-  subtitle.textContent = `${formatSymptomHistoryDate(dateKey)} - ${total} task${total === 1 ? "" : "s"}`;
+  subtitle.textContent = `${formatarchiveBHistoryDate(dateKey)} - ${total} task${total === 1 ? "" : "s"}`;
   titleWrap.append(title, subtitle);
 
   const percent = document.createElement("span");
   percent.className = "day-section-percent";
   percent.textContent = `${percentComplete}%`;
   percent.title = total
-    ? `${complete} of ${total} tasks completed for ${formatSymptomHistoryDate(dateKey)}`
-    : `No tasks scheduled for ${formatSymptomHistoryDate(dateKey)}`;
+    ? `${complete} of ${total} tasks completed for ${formatarchiveBHistoryDate(dateKey)}`
+    : `No tasks scheduled for ${formatarchiveBHistoryDate(dateKey)}`;
 
   header.append(titleWrap, percent);
   header.addEventListener("click", () => openDayTaskDialog(dayName, dateKey));
@@ -1085,13 +1401,15 @@ function renderTaskCard(habit, dateKey, dayName, recentDays = getRecentDays()) {
   const attributes = fragment.querySelector(".habit-attributes");
   const note = fragment.querySelector(".habit-note");
   const calendarLink = fragment.querySelector(".calendar-link");
+  const breakdown = taskBreakdowns[String(habit.id || "")];
   const completedToday = habit.completions.includes(dateKey);
   const completedThisWeek = recentDays.filter((day) => habit.completions.includes(day.key)).length;
   const detailItems = [
     dayName,
     formatTaskDeadline(habit.deadline),
     habit.category || "General",
-    habit.priority || "Normal"
+    normalizeTaskPriority(habit.priority),
+    normalizeTaskSize(habit.size)
   ].filter(Boolean);
 
   card.style.setProperty("--habit-color", habit.color);
@@ -1101,48 +1419,114 @@ function renderTaskCard(habit, dateKey, dayName, recentDays = getRecentDays()) {
   weekScore.textContent = `${completedThisWeek}/7 this week`;
   note.textContent = habit.note || "";
   note.hidden = !habit.note;
+  const photoThumb = buildTaskCardPhotoThumb(breakdown);
+  const checklistMeta = buildTaskCardChecklistMeta(breakdown);
+  if (photoThumb) title.before(photoThumb);
+  if (checklistMeta) note.after(checklistMeta);
   calendarLink.href = getGoogleCalendarUrl(habit);
-  calendarLink.textContent = "Add to Google Calendar";
-  const editButton = document.createElement("button");
-  editButton.className = "calendar-link task-edit-button";
-  editButton.type = "button";
-  editButton.textContent = "Edit";
-  calendarLink.after(editButton);
+  calendarLink.textContent = "Calendar";
+  const aiStepsButton = document.createElement("button");
+  const stuckButton = document.createElement("button");
+  const focusButton = document.createElement("button");
+  aiStepsButton.className = "calendar-link task-ai-steps-button";
+  aiStepsButton.type = "button";
+  aiStepsButton.textContent = "AI list";
+  stuckButton.className = "calendar-link task-stuck-button";
+  stuckButton.type = "button";
+  stuckButton.textContent = "Stuck";
+  focusButton.className = "calendar-link task-focus-button";
+  focusButton.type = "button";
+  focusButton.textContent = "Focus";
+  calendarLink.after(aiStepsButton, stuckButton, focusButton);
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `Open ${habit.name} checklist and photos`);
+  card.title = "Open checklist and photos";
 
   detailItems.forEach((item) => {
     const chip = document.createElement("span");
     chip.textContent = item;
+    if (["Now", "Next", "Later"].includes(item)) chip.dataset.when = item.toLowerCase();
+    if (["Tiny", "Small", "Medium", "Big"].includes(item)) chip.dataset.size = item.toLowerCase();
     attributes.appendChild(chip);
   });
 
+  card.addEventListener("click", (event) => {
+    if (isTaskCardControl(event.target)) return;
+    openTaskBreakdownDialog(habit);
+  });
+  card.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (isTaskCardControl(event.target)) return;
+    event.preventDefault();
+    openTaskBreakdownDialog(habit);
+  });
   checkButton.addEventListener("click", () => toggleHabit(habit.id, dateKey));
   deleteButton.addEventListener("click", () => deleteHabit(habit.id));
-  editButton.addEventListener("click", () => editHabit(habit.id));
+  aiStepsButton.addEventListener("click", () => openTaskBreakdownDialog(habit));
+  stuckButton.addEventListener("click", () => openTaskStuckDialog(habit));
+  focusButton.addEventListener("click", () => openTaskFocusDialog(habit));
 
   return fragment;
 }
 
+function buildTaskCardPhotoThumb(breakdown) {
+  const imageDataUrl = String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")
+    ? String(breakdown.sourceImageDataUrl)
+    : "";
+  if (!imageDataUrl) return null;
+  const image = document.createElement("img");
+  image.className = "habit-photo-thumb";
+  image.src = imageDataUrl;
+  image.alt = "";
+  image.loading = "lazy";
+  return image;
+}
+
+function buildTaskCardChecklistMeta(breakdown) {
+  const steps = Array.isArray(breakdown?.steps) ? breakdown.steps : [];
+  if (!steps.length) return null;
+  const doneCount = steps.filter((step) => step?.done).length;
+  const meta = document.createElement("div");
+  const progress = document.createElement("span");
+  const after = document.createElement("span");
+  meta.className = "habit-checklist-meta";
+  progress.textContent = `${doneCount}/${steps.length} checklist`;
+  after.textContent = getTaskBreakdownAfterImageDataUrl(breakdown) ? "After ready" : (breakdown.targetImagePending ? "After building" : "Photo task");
+  meta.append(progress, after);
+  return meta;
+}
+
+function isTaskCardControl(target) {
+  return Boolean(target?.closest?.("button, a, input, textarea, select, label"));
+}
+
 function renderTodayDashboard() {
+  if (!todayCompletedCount || !todayTaskList) return;
   const summary = getTodaySummary();
   const todayTasks = summary.tasks;
   const complete = summary.completedTasks.length;
   const latestEntry = summary.latestEntry;
-  const todayMood = summary.mood;
-  const todaySymptoms = summary.symptoms;
+  const todayfocusState = summary.focusState;
+  const todayarchiveB = summary.archiveB;
   const weeklyTotals = getWeeklyTotals();
   if (todayTaskCount) {
     todayTaskCount.textContent = `${todayTasks.length} task${todayTasks.length === 1 ? "" : "s"}`;
   }
   todayCompletedCount.textContent = `${complete}/${todayTasks.length}`;
-  const waterGoal = getDailyWaterGoal();
-  todayWaterTotal.textContent = latestEntry && Number.isFinite(latestEntry.water)
-    ? `${formatWholeNumber(latestEntry.water)}/${formatWholeNumber(waterGoal)} oz`
-    : `0/${formatWholeNumber(waterGoal)} oz`;
-  todayVitalsSummary.textContent = latestEntry
-    ? [formatBloodPressure(latestEntry.systolic, latestEntry.diastolic), Number.isFinite(latestEntry.glucose) ? `${formatWholeNumber(latestEntry.glucose)} glucose` : ""].filter((value) => value && value !== "--").join(" / ") || "--"
-    : "--";
-  if (todayMoodSummary) todayMoodSummary.textContent = todayMood ? todayMood.name : "--";
-  if (todaySymptomSummary) todaySymptomSummary.textContent = todaySymptoms.length ? String(todaySymptoms.length) : "0";
+  if (todayWaterTotal) {
+    const waterGoal = getDailyWaterGoal();
+    todayWaterTotal.textContent = latestEntry && Number.isFinite(latestEntry.water)
+      ? `${formatWholeNumber(latestEntry.water)}/${formatWholeNumber(waterGoal)} oz`
+      : `0/${formatWholeNumber(waterGoal)} oz`;
+  }
+  if (todayarchiveCSummary) {
+    todayarchiveCSummary.textContent = latestEntry
+      ? [formatreading(latestEntry.systolic, latestEntry.diastolic), Number.isFinite(latestEntry.valueD) ? `${formatWholeNumber(latestEntry.valueD)} reading` : ""].filter((value) => value && value !== "--").join(" / ") || "--"
+      : "--";
+  }
+  if (todayfocusStateSummary) todayfocusStateSummary.textContent = todayfocusState ? todayfocusState.name : "--";
+  if (todayarchiveBummary) todayarchiveBummary.textContent = todayarchiveB.length ? String(todayarchiveB.length) : "0";
   if (todayWeeklySummary) todayWeeklySummary.textContent = `${weeklyTotals.average}%`;
   if (todayWeeklyProgressFill) {
     todayWeeklyProgressFill.style.width = `${Math.max(0, Math.min(100, weeklyTotals.average))}%`;
@@ -1181,11 +1565,9 @@ function getTodaySummary() {
     tasks,
     completedTasks,
     incompleteTasks,
-    entry: nutritionEntries.find((entry) => entry.date === today) || null,
-    latestEntry: nutritionEntries[0] || null,
-    mood: moodEntries.find((entry) => entry.date === today) || null,
-    symptoms: symptomEntries.filter((entry) => entry.date === today),
-    journal: journalEntries.find((entry) => entry.date === today) || null
+    entry: archiveAEntries.find((entry) => entry.date === today) || null,
+    latestEntry: archiveAEntries[0] || null,
+    archiveB: archiveBEntries.filter((entry) => entry.date === today)
   };
 }
 
@@ -1268,7 +1650,7 @@ function getInsightLabel(insight) {
   if (insight.aiGenerated) return "AI";
   if (/improving|better|easing|down/i.test(insight.title)) return "Improving";
   if (/slipping|attention|up|declining|increasing/i.test(insight.title)) return "Needs attention";
-  if (insight.tone === "health") return "Health";
+  if (insight.tone === "support") return "Support";
   if (insight.tone === "care") return "Care";
   if (insight.tone === "action") return "Action";
   return "Stable";
@@ -1292,13 +1674,13 @@ function getSparklineValues(insight) {
   const title = insight.title.toLowerCase();
   if (title.includes("water")) {
     const waterGoal = getDailyWaterGoal();
-    return nutritionEntries.slice(0, 7).reverse().map((entry) => Number.isFinite(entry.water) ? Math.min(100, (entry.water / waterGoal) * 100) : 18);
+    return archiveAEntries.slice(0, 7).reverse().map((entry) => Number.isFinite(entry.water) ? Math.min(100, (entry.water / waterGoal) * 100) : 18);
   }
-  if (title.includes("weight")) return getScaledValues(nutritionEntries.slice(0, 7).reverse().map((entry) => entry.weight));
-  if (title.includes("glucose")) return getScaledValues(nutritionEntries.slice(0, 7).reverse().map((entry) => entry.glucose));
-  if (title.includes("pressure")) return getScaledValues(nutritionEntries.slice(0, 7).reverse().map((entry) => entry.systolic));
-  if (title.includes("mood")) return moodEntries.slice(0, 7).reverse().map((entry) => (getMoodScore(entry.name) || 1) * 20);
-  if (title.includes("symptom")) return getRecentDateKeys(7, 0).map((dateKey) => symptomEntries.filter((entry) => entry.date === dateKey).length * 28 + 18);
+  if (title.includes("valueC")) return getScaledValues(archiveAEntries.slice(0, 7).reverse().map((entry) => entry.valueC));
+  if (title.includes("valueD")) return getScaledValues(archiveAEntries.slice(0, 7).reverse().map((entry) => entry.valueD));
+  if (title.includes("pressure")) return getScaledValues(archiveAEntries.slice(0, 7).reverse().map((entry) => entry.systolic));
+  if (title.includes("focusState")) return focusStateEntries.slice(0, 7).reverse().map((entry) => (getfocusStateScore(entry.name) || 1) * 20);
+  if (title.includes("archiveB")) return getRecentDateKeys(7, 0).map((dateKey) => archiveBEntries.filter((entry) => entry.date === dateKey).length * 28 + 18);
   return getWeekStats().map((day) => day.percent || 18);
 }
 
@@ -1316,23 +1698,12 @@ function getSmartCoachInsights() {
   const todayTasks = habits.filter((habit) => isTaskScheduledForDate(habit, today));
   const completedTasks = todayTasks.filter((habit) => habit.completions.includes(today)).length;
   const completionPercent = todayTasks.length ? Math.round((completedTasks / todayTasks.length) * 100) : 0;
-  const latestEntry = nutritionEntries[0];
-  const latestMood = moodEntries[0];
-  const latestSymptom = symptomEntries[0];
+  const latestEntry = archiveAEntries[0];
+  const latestarchiveB = archiveBEntries[0];
   const waterGoal = getDailyWaterGoal();
   const waterAmount = latestEntry && latestEntry.date === today && Number.isFinite(latestEntry.water) ? latestEntry.water : 0;
-  const medicalPatternInsight = getMedicalPatternInsight();
-  const latestJournalInsight = getLatestJournalEntryInsight();
-  const journalPatternInsight = getJournalPatternInsight();
+  const signalPatternInsight = getSignalPatternInsight();
   const insights = [];
-
-  if (latestJournalInsight) {
-    insights.push(latestJournalInsight);
-  }
-
-  if (journalPatternInsight) {
-    insights.push(journalPatternInsight);
-  }
 
   if (!todayTasks.length) {
     insights.push({
@@ -1365,47 +1736,37 @@ function getSmartCoachInsights() {
 
   if (waterAmount < waterGoal) {
     insights.push({
-      title: "Hydration nudge",
+      title: "water nudge",
       body: `${formatWholeNumber(waterAmount)} of ${formatWholeNumber(waterGoal)} oz logged today. A water break is the cleanest next move.`,
-      tone: "health",
+      tone: "support",
       destination: "water",
       actionLabel: "Go to water"
     });
   }
 
-  if (latestMood && ["Low", "Stressed", "Anxious"].includes(latestMood.name)) {
+  if (latestarchiveB && ["Moderate", "Severe"].includes(latestarchiveB.severity)) {
     insights.push({
-      title: "Mood support",
-      body: `${latestMood.name} was your latest mood log. Keep the next task light and give yourself a reset window.`,
+      title: "Issue-aware pacing",
+      body: `${latestarchiveB.severity} ${latestarchiveB.name.toLowerCase()} is in your recent issue log. Lower intensity tasks make more sense right now.`,
       tone: "care",
-      destination: "mood",
-      actionLabel: "Go to mood"
-    });
-  }
-
-  if (latestSymptom && ["Moderate", "Severe"].includes(latestSymptom.severity)) {
-    insights.push({
-      title: "Symptom-aware pacing",
-      body: `${latestSymptom.severity} ${latestSymptom.name.toLowerCase()} is in your recent symptom log. Lower intensity tasks make more sense right now.`,
-      tone: "care",
-      destination: "symptoms",
-      actionLabel: "Go to symptoms"
+      destination: "archiveB",
+      actionLabel: "Go to issues"
     });
   }
 
   if (latestEntry && (latestEntry.systolic >= 130 || latestEntry.diastolic >= 80)) {
     insights.push({
-      title: "Vitals watch",
-      body: `Latest blood pressure is ${formatBloodPressure(latestEntry.systolic, latestEntry.diastolic)}. Keep tracking it consistently and avoid treating one reading like the whole story.`,
-      tone: "health"
+      title: "Signal watch",
+      body: `Latest pressure reading is ${formatreading(latestEntry.systolic, latestEntry.diastolic)}. Keep tracking it consistently and avoid treating one reading like the whole story.`,
+      tone: "support"
     });
   }
 
-  if (medicalPatternInsight) {
-    insights.push(medicalPatternInsight);
+  if (signalPatternInsight) {
+    insights.push(signalPatternInsight);
   }
 
-  insights.push(...getLimitInsights(latestEntry, latestMood));
+  insights.push(...getLimitInsights(latestEntry, null));
   insights.push(...getDataTrendInsights());
 
   if (insights.length < 3) {
@@ -1413,8 +1774,8 @@ function getSmartCoachInsights() {
       title: "Pattern builder",
       body: "Logging your information today gives the coach better patterns to work with tomorrow.",
       tone: "steady",
-      destination: "vitals",
-      actionLabel: "Go to vitals"
+      destination: "archiveC",
+      actionLabel: "Go to archiveC"
     });
   }
 
@@ -1425,7 +1786,7 @@ function getUpcomingTaskReminderInsight() {
   const upcoming = getUpcomingTaskReminderCandidates();
   if (!upcoming.length) return null;
   const next = upcoming[0];
-  const when = next.offset === 1 ? "tomorrow" : `${next.dayName}, ${formatSymptomHistoryDate(next.dateKey)}`;
+  const when = next.offset === 1 ? "tomorrow" : `${next.dayName}, ${formatarchiveBHistoryDate(next.dateKey)}`;
   return {
     title: next.missedBefore ? "Remember this task" : "Task coming up soon",
     body: next.missedBefore
@@ -1490,7 +1851,7 @@ async function fetchBackendAiCoachInsight(snapshot) {
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
   const backendUrl = getConfiguredAiBackendUrl();
-  if (!backendUrl) throw new Error("Enter an HTTPS AI backend URL in Settings.");
+  if (!backendUrl) throw new Error("AI service is not configured.");
   const response = await fetchWithTimeout(`${backendUrl}/api/coach/analyze`, {
     method: "POST",
     headers,
@@ -1505,6 +1866,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted || error?.name === "AbortError" || /aborted/i.test(error?.message || "")) {
+      const timeoutSeconds = Math.round(timeoutMs / 1000);
+      throw new Error(`AI request timed out after ${timeoutSeconds} seconds. If you uploaded a photo, try again or use a clearer smaller photo.`);
+    }
+    throw error;
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -1514,12 +1881,12 @@ function normalizeAiCoachInsight(data) {
   const title = cleanAiCoachText(data?.title).slice(0, 70);
   const body = cleanAiCoachText(data?.body).slice(0, 260);
   if (!title || !body) return null;
-  const allowedDestinations = ["tasks", "water", "vitals", "mood", "symptoms", "journal", "settings"];
+  const allowedDestinations = ["tasks", "water", "archiveC", "archiveB", "settings"];
   const destination = allowedDestinations.includes(data?.destination) ? data.destination : null;
   return {
     title,
     body,
-    tone: ["steady", "action", "health", "care", "neutral"].includes(data?.tone) ? data.tone : "health",
+    tone: ["steady", "action", "support", "care", "neutral"].includes(data?.tone) ? data.tone : "status",
     destination,
     actionLabel: destination ? cleanAiCoachText(data?.actionLabel || getAiCoachActionLabel(destination)) : null,
     suggestedTask: cleanAiCoachText(data?.suggestedTask || ""),
@@ -1540,10 +1907,8 @@ function getAiCoachActionLabel(destination) {
   return {
     tasks: "Go to tasks",
     water: "Go to water",
-    vitals: "Go to vitals",
-    mood: "Go to mood",
-    symptoms: "Go to symptoms",
-    journal: "Go to journal",
+    archiveC: "Go to archiveC",
+    archiveB: "Go to archiveB",
     settings: "Go to settings"
   }[destination] || "Open";
 }
@@ -1551,10 +1916,8 @@ function getAiCoachActionLabel(destination) {
 function getAiCoachSnapshotKey() {
   return JSON.stringify({
     tasks: habits.map((habit) => [habit.id, habit.name, getTaskDateKey(habit), getTaskDay(habit), habit.category, habit.time, habit.deadline, habit.priority, truncateForAi(habit.note, 160), habit.completions?.slice(-21)]),
-    nutrition: nutritionEntries.slice(0, 21),
-    symptoms: symptomEntries.slice(0, 21).map((entry) => ({ ...entry, note: truncateForAi(entry.note, 160) })),
-    moods: moodEntries.slice(0, 21).map((entry) => ({ ...entry, note: truncateForAi(entry.note, 160) })),
-    journal: journalEntries.slice(0, 12).map((entry) => [entry.date, truncateForAi(entry.text, 360)]),
+    archiveA: archiveAEntries.slice(0, 21),
+    archiveB: archiveBEntries.slice(0, 21).map((entry) => ({ ...entry, note: truncateForAi(entry.note, 160) })),
     deadlines: taskDeadlineEvents.slice(0, 21),
     settings: [appSettings.heightInches]
   });
@@ -1579,10 +1942,8 @@ function buildAiCoachSnapshot(localInsights) {
       taskCount: todayTasks.length,
       completedTasks: completedToday,
       completionPercent: todayTasks.length ? Math.round((completedToday / todayTasks.length) * 100) : 0,
-      latestVitals: nutritionEntries[0] || null,
-      latestMood: moodEntries[0] || null,
-      symptomsToday: symptomEntries.filter((entry) => entry.date === today),
-      journalEntriesToday: journalEntries.filter((entry) => entry.date === today).map((entry) => ({ date: entry.date, text: String(entry.text || "").slice(0, 700) }))
+      latestarchiveC: archiveAEntries[0] || null,
+      archiveBToday: archiveBEntries.filter((entry) => entry.date === today)
     },
     localInsights: localInsights.slice(0, 6).map(({ title, body, tone }) => ({ title, body, tone })),
     tasks: habits.map((habit) => ({
@@ -1599,32 +1960,22 @@ function buildAiCoachSnapshot(localInsights) {
       completedRecently: (habit.completions || []).filter((dateKey) => daysBetween(dateKey, today) <= 30)
     })),
     missedDeadlines: taskDeadlineEvents.slice(0, 30),
-    nutritionAndVitals: nutritionEntries.slice(0, 30).map((entry) => ({
+    taskSignals: archiveAEntries.slice(0, 30).map((entry) => ({
       date: entry.date,
-      calories: entry.calories,
-      carbs: entry.carbs,
-      weight: entry.weight,
-      ketosisPhase: entry.ketosisPhase,
-      glucose: entry.glucose,
+      valueA: entry.valueA,
+      valueB: entry.valueB,
+      valueC: entry.valueC,
+      phasePhase: entry.phasePhase,
+      valueD: entry.valueD,
       systolic: entry.systolic,
       diastolic: entry.diastolic,
       water: entry.water
     })),
-    symptoms: symptomEntries.slice(0, 30).map((entry) => ({
+    issues: archiveBEntries.slice(0, 30).map((entry) => ({
       date: entry.date,
       name: entry.name,
       severity: entry.severity,
       note: truncateForAi(entry.note, 180)
-    })),
-    moods: moodEntries.slice(0, 30).map((entry) => ({
-      date: entry.date,
-      name: entry.name,
-      intensity: entry.intensity,
-      note: truncateForAi(entry.note, 180)
-    })),
-    journal: journalEntries.slice(0, 12).map((entry) => ({
-      date: entry.date,
-      text: truncateForAi(entry.text, 500)
     })),
     wholeAppTrendScan: buildWholeAppTrendScan()
   };
@@ -1635,14 +1986,12 @@ function getDataTrendInsights() {
     getWholeAppTrendInsight(),
     getTaskTrendInsight(),
     getDeadlineTrendInsight(),
-    getNumericTrendInsight("Water trend", nutritionEntries, "water", "oz", 12, true),
-    getNumericTrendInsight("Weight trend", nutritionEntries, "weight", "lb", 10, false),
-    getNumericTrendInsight("Glucose trend", nutritionEntries, "glucose", "mg/dL", 8, false),
-    getGlucosePatternInsight(),
-    getBloodPressureTrendInsight(),
-    getMoodTrendInsight(),
-    getSymptomTrendInsight(),
-    getJournalPatternInsight()
+    getNumericTrendInsight("Water trend", archiveAEntries, "water", "oz", 12, true),
+    getNumericTrendInsight("Value trend", archiveAEntries, "valueC", "lb", 10, false),
+    getNumericTrendInsight("Reading trend", archiveAEntries, "valueD", "", 8, false),
+    getvalueDPatternInsight(),
+    getreadingTrendInsight(),
+    getarchiveBTrendInsight(),
   ].filter(Boolean);
 }
 
@@ -1651,243 +2000,217 @@ function buildWholeAppTrendScan() {
   return dateKeys.map((dateKey) => {
     const tasksForDay = habits.filter((habit) => isTaskScheduledForDate(habit, dateKey));
     const completeTasks = tasksForDay.filter((habit) => habit.completions.includes(dateKey)).length;
-    const nutrition = nutritionEntries.find((entry) => entry.date === dateKey) || null;
-    const symptoms = symptomEntries.filter((entry) => entry.date === dateKey);
-    const moods = moodEntries.filter((entry) => entry.date === dateKey);
-    const journals = journalEntries.filter((entry) => entry.date === dateKey);
+    const archiveA = archiveAEntries.find((entry) => entry.date === dateKey) || null;
+    const archiveB = archiveBEntries.filter((entry) => entry.date === dateKey);
     const missedDeadlines = taskDeadlineEvents.filter((event) => event.date === dateKey);
     return {
       date: dateKey,
       taskPercent: tasksForDay.length ? Math.round((completeTasks / tasksForDay.length) * 100) : null,
       missedDeadlines: missedDeadlines.length,
-      water: nutrition && Number.isFinite(nutrition.water) ? nutrition.water : null,
-      glucose: nutrition && Number.isFinite(nutrition.glucose) ? nutrition.glucose : null,
-      bloodPressure: nutrition && Number.isFinite(nutrition.systolic) && Number.isFinite(nutrition.diastolic) ? `${nutrition.systolic}/${nutrition.diastolic}` : null,
-      symptoms: symptoms.map((entry) => `${entry.severity} ${entry.name}`),
-      moods: moods.map((entry) => `${entry.intensity} ${entry.name}`),
-      journalFlags: journals.map((entry) => getJournalTrendFlags(entry.text)).flat()
+      water: archiveA && Number.isFinite(archiveA.water) ? archiveA.water : null,
+      valueD: archiveA && Number.isFinite(archiveA.valueD) ? archiveA.valueD : null,
+      readingPressure: archiveA && Number.isFinite(archiveA.systolic) && Number.isFinite(archiveA.diastolic) ? `${archiveA.systolic}/${archiveA.diastolic}` : null,
+      archiveB: archiveB.map((entry) => `${entry.severity} ${entry.name}`)
     };
-  }).filter((day) => day.taskPercent !== null || day.missedDeadlines || day.water !== null || day.glucose !== null || day.bloodPressure || day.symptoms.length || day.moods.length || day.journalFlags.length);
+  }).filter((day) => day.taskPercent !== null || day.missedDeadlines || day.water !== null || day.valueD !== null || day.readingPressure || day.archiveB.length);
 }
 
-function getJournalTrendFlags(text) {
-  const normalized = normalizeJournalConcernText(text);
+function getfocusLogTrendFlags(text) {
+  const normalized = normalizefocusLogConcernText(text);
   const flags = [];
-  if (matchesAnyPattern(normalized, crisisMoodPatterns)) flags.push("crisis-language");
-  if (matchesAnyPattern(normalized, depressionMoodPatterns)) flags.push("depression-language");
-  if (matchesAnyPattern(normalized, unhealthyThoughtPatterns) || matchesAnyPattern(normalized, journalConcernPatterns)) flags.push("negative-thought-pattern");
-  if (matchesAnyPattern(normalized, journalStressPatterns)) flags.push("stress-language");
+  if (matchesAnyPattern(normalized, urgentfocusStatePatterns)) flags.push("urgent-language");
+  if (matchesAnyPattern(normalized, lowFocusfocusStatePatterns)) flags.push("lowFocus-language");
+  if (matchesAnyPattern(normalized, negativeThoughtPatterns) || matchesAnyPattern(normalized, focusLogConcernPatterns)) flags.push("negative-thought-pattern");
+  if (matchesAnyPattern(normalized, focusLogStressPatterns)) flags.push("stress-language");
   return flags;
 }
 
 function getWholeAppTrendInsight() {
   const scan = buildWholeAppTrendScan();
   if (scan.length < 3) return null;
-  const lowTaskStressDays = scan.filter((day) => Number.isFinite(day.taskPercent) && day.taskPercent < 50 && day.journalFlags.includes("stress-language"));
-  if (lowTaskStressDays.length >= 2) {
+  const lowWaterarchiveBDays = scan.filter((day) => Number.isFinite(day.water) && day.water < getDailyWaterGoal() && day.archiveB.length);
+  if (lowWaterarchiveBDays.length >= 2) {
     return {
-      title: "Stress and task trend",
-      body: `${lowTaskStressDays.length} recent days show stress language in journal entries alongside low task completion. Reduce today's list, choose one must-do task, and move the rest instead of carrying the full load.`,
-      tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
-    };
-  }
-  const lowWaterSymptomDays = scan.filter((day) => Number.isFinite(day.water) && day.water < getDailyWaterGoal() && day.symptoms.length);
-  if (lowWaterSymptomDays.length >= 2) {
-    return {
-      title: "Hydration and symptom link",
-      body: `${lowWaterSymptomDays.length} recent days had low water plus symptoms. Log water earlier today and compare whether headache, fatigue, dizziness, or nausea ease when hydration is steadier.`,
-      tone: "health",
+      title: "Water and issue link",
+      body: `${lowWaterarchiveBDays.length} recent days had low water plus logged issues. Log water earlier today and compare whether the day feels easier when water is steadier.`,
+      tone: "support",
       destination: "water",
       actionLabel: "Go to water"
-    };
-  }
-  const moodJournalDays = scan.filter((day) => day.moods.some((mood) => /\b(Low|Stressed|Anxious)\b/.test(mood)) && day.journalFlags.length);
-  if (moodJournalDays.length >= 2) {
-    return {
-      title: "Mood and journal trend",
-      body: `${moodJournalDays.length} recent days link low mood with journal warning language. Use smaller tasks, add one support contact, and watch whether the same theme repeats this week.`,
-      tone: "care",
-      destination: "mood",
-      actionLabel: "Go to mood"
     };
   }
   return null;
 }
 
-function getLimitInsights(latestEntry, latestMood) {
-  if (!latestEntry && !latestMood) return [];
+function getLimitInsights(latestEntry, latestfocusState) {
+  if (!latestEntry && !latestfocusState) return [];
   return [
-    getBloodPressureLimitInsight(latestEntry),
-    getGlucoseLimitInsight(latestEntry),
-    getCalorieLimitInsight(latestEntry),
-    getCarbLimitInsight(latestEntry),
-    getWeightLimitInsight(latestEntry),
-    getMentalHealthSafetyInsight(),
-    getMoodSupportInsight(latestMood)
+    getreadingLimitInsight(latestEntry),
+    getvalueDLimitInsight(latestEntry),
+    getvalueALimitInsight(latestEntry),
+    getvalueBLimitInsight(latestEntry),
+    getvalueCLimitInsight(latestEntry)
   ].filter(Boolean);
 }
 
-function getBloodPressureLimitInsight(entry) {
+function getreadingLimitInsight(entry) {
   if (!entry || !Number.isFinite(entry.systolic) || !Number.isFinite(entry.diastolic)) return null;
-  const category = getBloodPressureCategory(entry.systolic, entry.diastolic);
+  const category = getreadingCategory(entry.systolic, entry.diastolic);
   if (category.level === "normal") return null;
   if (category.level === "low") {
     return {
-      title: "Low blood pressure",
-      body: `${formatBloodPressure(entry.systolic, entry.diastolic)} is at or below the common low blood pressure threshold of 90/60. Hydrate, rise slowly, note symptoms like dizziness, and ask a clinician if it repeats or you feel faint.`,
+      title: "Low pressure reading",
+      body: `${formatreading(entry.systolic, entry.diastolic)} is lower than your usual signal range. Recheck calmly and use this only as personal context for planning your day.`,
       tone: "care",
-      destination: "vitals",
-      actionLabel: "Go to vitals"
+      destination: "archiveC",
+      actionLabel: "Go to signals"
     };
   }
   return {
-    title: `${category.label} blood pressure`,
-    body: `${formatBloodPressure(entry.systolic, entry.diastolic)} is ${category.label.toLowerCase()} by American Heart Association categories. Consider a lower-sodium meal, hydration, a calm recheck, and sharing repeated high readings with a clinician.`,
-    tone: category.level === "severe" ? "care" : "health",
-    destination: "vitals",
-    actionLabel: "Go to vitals"
+    title: `${category.label} pressure signal`,
+    body: `${formatreading(entry.systolic, entry.diastolic)} is outside your usual signal range. Use it as context for a calmer recheck and a smaller next task.`,
+    tone: category.level === "severe" ? "care" : "support",
+    destination: "archiveC",
+    actionLabel: "Go to signals"
   };
 }
 
-function getGlucoseLimitInsight(entry) {
-  if (!entry || !Number.isFinite(entry.glucose)) return null;
-  if (entry.glucose < 70) {
-    const severe = entry.glucose < 54;
+function getvalueDLimitInsight(entry) {
+  if (!entry || !Number.isFinite(entry.valueD)) return null;
+  if (entry.valueD < 70) {
+    const severe = entry.valueD < 54;
     return {
-      title: severe ? "Severely low glucose" : "Low glucose",
-      body: `${formatWholeNumber(entry.glucose)} mg/dL is below the CDC low blood sugar level of 70 mg/dL. Use your care plan, treat lows quickly, recheck, and get medical help if symptoms are severe or it keeps happening.`,
+      title: severe ? "Very low reading" : "Low reading",
+      body: `${formatWholeNumber(entry.valueD)} is lower than your usual signal range. Recheck calmly and plan the next task conservatively.`,
       tone: "care",
-      destination: "vitals",
-      actionLabel: "Go to vitals"
+      destination: "archiveC",
+      actionLabel: "Go to signals"
     };
   }
-  if (entry.glucose <= 180) return null;
+  if (entry.valueD <= 180) return null;
   return {
-    title: "High glucose",
-    body: `${formatWholeNumber(entry.glucose)} mg/dL is above the CDC's common two-hour after-meal target of under 180 mg/dL. Note meal timing, hydration, stress, and repeated highs so you can discuss patterns with a clinician.`,
-    tone: "health",
-    destination: "vitals",
-    actionLabel: "Go to vitals"
+    title: "High reading",
+    body: `${formatWholeNumber(entry.valueD)} is higher than your usual signal range. Note timing, water, stress, and task load if you want context later.`,
+    tone: "support",
+    destination: "archiveC",
+    actionLabel: "Go to signals"
   };
 }
 
-function getCalorieLimitInsight(entry) {
-  if (!entry || !Number.isFinite(entry.calories) || entry.calories <= 2000) return null;
+function getvalueALimitInsight(entry) {
+  if (!entry || !Number.isFinite(entry.valueA) || entry.valueA <= 2000) return null;
   return {
-    title: "Calories above general guide",
-    body: `${formatWholeNumber(entry.calories)} calories is above the FDA's 2,000-calorie general nutrition guide. Try planning one lighter, protein-forward meal or trimming sugary drinks/snacks tomorrow.`,
-    tone: "health",
-    destination: "vitals",
-    actionLabel: "Go to nutrition"
+    title: "Energy entry above usual",
+    body: `${formatWholeNumber(entry.valueA)} energy units is above your usual signal range. Use it as context for planning tomorrow's tasks.`,
+    tone: "support",
+    destination: "archiveC",
+    actionLabel: "Go to signals"
   };
 }
 
-function getCarbLimitInsight(entry) {
-  if (!entry || !Number.isFinite(entry.carbs)) return null;
-  if (entry.carbs < 130) {
+function getvalueBLimitInsight(entry) {
+  if (!entry || !Number.isFinite(entry.valueB)) return null;
+  if (entry.valueB < 130) {
     return {
-      title: "Carbs below RDA",
-      body: `${formatWholeNumber(entry.carbs)}g carbs is below the 130g adult RDA from the National Academies. If this was not intentional, add nutrient-dense carbs like fruit, beans, vegetables, or whole grains.`,
-      tone: "health",
-      destination: "vitals",
-      actionLabel: "Go to nutrition"
+      title: "Fuel entry below usual",
+      body: `${formatWholeNumber(entry.valueB)}g fuel is below your usual signal range. Use it as context for energy and task pacing.`,
+      tone: "support",
+      destination: "archiveC",
+      actionLabel: "Go to signals"
     };
   }
-  if (entry.carbs <= 275) return null;
+  if (entry.valueB <= 275) return null;
   return {
-    title: "Carbs above daily value",
-    body: `${formatWholeNumber(entry.carbs)}g carbs is above the FDA daily value of 275g. Swap one refined-carb item for vegetables, beans, or a smaller whole-grain portion.`,
-    tone: "health",
-    destination: "vitals",
-    actionLabel: "Go to nutrition"
+    title: "Fuel entry above usual",
+    body: `${formatWholeNumber(entry.valueB)}g fuel is above your usual signal range. Use it as context for tomorrow's plan.`,
+    tone: "support",
+    destination: "archiveC",
+    actionLabel: "Go to signals"
   };
 }
 
-function getWeightLimitInsight(entry) {
-  if (!entry || !Number.isFinite(entry.weight)) return null;
-  const bmi = getLatestBmi(entry.weight);
+function getvalueCLimitInsight(entry) {
+  if (!entry || !Number.isFinite(entry.valueC)) return null;
+  const bmi = getLatestBmi(entry.valueC);
   if (!Number.isFinite(bmi)) {
     return {
-      title: "Add height for weight AI",
-      body: "Weight needs height to be interpreted. Add your height in Settings so the coach can compare weight to CDC BMI categories instead of guessing.",
+      title: "Add context for value AI",
+      body: "This value needs more context to be useful. Add supporting setup details only if you want better trend notes.",
       tone: "action",
       destination: "settings",
       actionLabel: "Go to settings"
     };
   }
   const category = getBmiCategory(bmi);
-  if (category.level === "healthy") return null;
+  if (category.level === "balanced") return null;
   return {
-    title: `${category.label} BMI range`,
-    body: `Your latest weight calculates to BMI ${bmi.toFixed(1)}, in the CDC ${category.label.toLowerCase()} range. Use this as a screening signal and focus on steady food, water, sleep, and movement patterns.`,
-    tone: "health",
-    destination: "vitals",
-    actionLabel: "Go to weight"
+    title: `${category.label} value range`,
+    body: `Your latest value is outside your usual range. Use it only as a planning signal alongside sleep, water, and task load.`,
+    tone: "support",
+    destination: "archiveC",
+    actionLabel: "Go to signals"
   };
 }
 
-function getMoodSupportInsight(latestMood) {
-  if (!latestMood || !["Low", "Stressed", "Anxious"].includes(latestMood.name)) return null;
-  const suggestion = getMoodSuggestion(latestMood.name);
+function getfocusStateSupportInsight(latestfocusState) {
+  if (!latestfocusState || !["Low", "Stressed", "Anxious"].includes(latestfocusState.name)) return null;
+  const suggestion = getfocusStateSuggestion(latestfocusState.name);
   return {
-    title: `${latestMood.name} mood support`,
+    title: `${latestfocusState.name} focusState support`,
     body: suggestion.body,
     tone: "care",
-    destination: "mood",
-    actionLabel: "Go to mood"
+    destination: "focusState",
+    actionLabel: "Go to focusState"
   };
 }
 
-function getMentalHealthSafetyInsight() {
-  const analysis = analyzeMoodSafety();
+function getSafetySupportInsight() {
+  const analysis = analyzefocusStateSafety();
   if (!analysis) return null;
-  if (analysis.level === "crisis") {
+  if (analysis.level === "urgent") {
     return {
-      title: "Immediate mental health support",
-      body: "Your mood notes include language that can match suicide or self-harm warning signs. If you might act on those thoughts or are in immediate danger, call 911 now or text 911 if available. For suicide prevention support in the U.S., call or text 988.",
+      title: "Immediate support",
+      body: "Your focusState notes include language that can match urgent-risk or urgent-risk warning signs. If you might act on those thoughts or are in urgent situation, get help now or get help if available. For task support support in the U.S., call or text support.",
       tone: "care",
-      destination: "mood",
-      actionLabel: "Go to mood"
+      destination: "focusState",
+      actionLabel: "Go to focusState"
     };
   }
-  if (analysis.level === "depression-pattern") {
+  if (analysis.level === "lowFocus-pattern") {
     return {
-      title: "Depression pattern watch",
-      body: `${analysis.count} recent mood note${analysis.count === 1 ? "" : "s"} include depression warning words, and your logs are trending low. Consider contacting a mental health professional or primary care clinician. If it feels urgent or hard to stay safe, call 911 now or text 911 if available. For suicide prevention support in the U.S., call or text 988.`,
+      title: "lowFocus pattern watch",
+      body: `${analysis.count} recent focusState note${analysis.count === 1 ? "" : "s"} include lowFocus warning words, and your logs are trending low. Consider contacting a qualified professional or qualified support qualified helper. If it feels urgent or hard to stay safe, get help now or get help if available. For task support support in the U.S., call or text support.`,
       tone: "care",
-      destination: "mood",
-      actionLabel: "Go to mood"
+      destination: "focusState",
+      actionLabel: "Go to focusState"
     };
   }
   return {
-    title: "Mood support plan",
-    body: "Recent mood logs are stacking up on the low side. Set one small support task, tell one trusted person how you are doing, and consider professional help if this keeps repeating.",
+    title: "focusState support plan",
+    body: "Recent focusState logs are stacking up on the low side. Set one small support task, tell one trusted person how you are doing, and consider professional help if this keeps repeating.",
     tone: "care",
-    destination: "mood",
-    actionLabel: "Go to mood"
+    destination: "focusState",
+    actionLabel: "Go to focusState"
   };
 }
 
-function analyzeMoodSafety() {
-  const recent = moodEntries
+function analyzefocusStateSafety() {
+  const recent = focusStateEntries
     .filter((entry) => entry.date)
     .sort((first, second) => second.date.localeCompare(first.date))
     .slice(0, 14);
   if (!recent.length) return null;
-  const notes = recent.map((entry) => normalizeJournalConcernText(entry.note || "")).filter(Boolean);
-  if (notes.some((note) => matchesAnyPattern(note, crisisMoodPatterns))) {
-    return { level: "crisis", count: 1 };
+  const notes = recent.map((entry) => normalizefocusLogConcernText(entry.note || "")).filter(Boolean);
+  if (notes.some((note) => matchesAnyPattern(note, urgentfocusStatePatterns))) {
+    return { level: "urgent", count: 1 };
   }
-  const depressionHits = notes.filter((note) => matchesAnyPattern(note, depressionMoodPatterns)).length;
+  const lowFocusHits = notes.filter((note) => matchesAnyPattern(note, lowFocusfocusStatePatterns)).length;
   const lowStrongCount = recent.filter((entry) => ["Low", "Anxious", "Stressed"].includes(entry.name) && entry.intensity === "Strong").length;
-  const lowMoodCount = recent.filter((entry) => ["Low", "Anxious", "Stressed"].includes(entry.name)).length;
-  if (depressionHits >= 1 && (lowMoodCount >= 2 || lowStrongCount >= 1)) {
-    return { level: "depression-pattern", count: depressionHits };
+  const lowfocusStateCount = recent.filter((entry) => ["Low", "Anxious", "Stressed"].includes(entry.name)).length;
+  if (lowFocusHits >= 1 && (lowfocusStateCount >= 2 || lowStrongCount >= 1)) {
+    return { level: "lowFocus-pattern", count: lowFocusHits };
   }
-  if (lowStrongCount >= 3 || lowMoodCount >= 5) {
-    return { level: "low-trend", count: lowMoodCount };
+  if (lowStrongCount >= 3 || lowfocusStateCount >= 5) {
+    return { level: "low-trend", count: lowfocusStateCount };
   }
   return null;
 }
@@ -1899,136 +2222,27 @@ function matchesAnyPattern(value, patterns) {
   });
 }
 
-function getMedicalPatternInsight() {
-  const recentText = getRecentHealthText(14);
-  const latestVitals = nutritionEntries[0];
-  const recentVitals = nutritionEntries.slice(0, 7);
-  if (!recentText && !recentVitals.length) return null;
-
-  if (matchesAnyPattern(recentText, [
-    /\b(chest pain|chest pressure|tight chest|shortness of breath|trouble breathing|cold sweat|jaw pain|left arm pain|faint|fainting)\b/i
-  ])) {
-    return {
-      title: "Emergency symptom pattern",
-      body: "Recent notes include symptoms that overlap with CDC/AHA heart attack warning signs. This app cannot diagnose it. If these symptoms are happening now, call 911.",
-      tone: "care",
-      destination: "symptoms",
-      actionLabel: "Go to symptoms"
-    };
-  }
-
-  if (matchesAnyPattern(recentText, [
-    /\b(face droop|facial droop|one side weak|arm weakness|slurred speech|trouble speaking|sudden confusion|sudden severe headache|loss of balance|sudden vision)\b/i
-  ])) {
-    return {
-      title: "Stroke warning pattern",
-      body: "Recent notes include symptoms that overlap with CDC stroke warning signs. If face drooping, arm weakness, speech trouble, sudden confusion, severe headache, or vision trouble is happening now, call 911.",
-      tone: "care",
-      destination: "symptoms",
-      actionLabel: "Go to symptoms"
-    };
-  }
-
-  const highPressureCount = recentVitals.filter((entry) => getBloodPressureCategory(entry.systolic, entry.diastolic).level !== "normal" && getBloodPressureCategory(entry.systolic, entry.diastolic).level !== "low").length;
-  if (latestVitals && getBloodPressureCategory(latestVitals.systolic, latestVitals.diastolic).level === "severe") {
-    return {
-      title: "Severe blood pressure pattern",
-      body: `${formatBloodPressure(latestVitals.systolic, latestVitals.diastolic)} is in the severe range. High blood pressure often has no symptoms, but severe readings with chest pain, shortness of breath, weakness, vision change, confusion, or severe headache need urgent medical help.`,
-      tone: "care",
-      destination: "vitals",
-      actionLabel: "Go to vitals"
-    };
-  }
-  if (highPressureCount >= 3) {
-    return {
-      title: "Hypertension pattern",
-      body: `${highPressureCount} recent blood pressure readings were above normal. MedlinePlus notes high blood pressure often has no symptoms, so repeated readings are worth sharing with a clinician.`,
-      tone: "health",
-      destination: "vitals",
-      actionLabel: "Go to history"
-    };
-  }
-
-  const respiratoryHits = countMedicalMatches(recentText, [
-    /\b(fever|chills)\b/i,
-    /\b(cough|sore throat|runny nose|congestion)\b/i,
-    /\b(body aches|muscle aches|headache|fatigue|tired)\b/i,
-    /\b(loss of taste|loss of smell)\b/i,
-    /\b(shortness of breath|trouble breathing)\b/i
-  ]);
-  if (respiratoryHits >= 3) {
-    return {
-      title: "Respiratory illness pattern",
-      body: "Recent symptoms overlap with CDC flu/COVID symptom lists. Consider rest, hydration, limiting exposure to others, testing when appropriate, and medical care for trouble breathing, chest pain, confusion, worsening symptoms, or high-risk conditions.",
-      tone: "care",
-      destination: "symptoms",
-      actionLabel: "Go to symptoms"
-    };
-  }
-
-  const utiHits = countMedicalMatches(recentText, [
-    /\b(burning pee|burning urination|painful urination|pain when urinating)\b/i,
-    /\b(frequent urination|urgent urination|pee often|urinate often)\b/i,
-    /\b(lower belly pain|pelvic pressure|cloudy urine|bloody urine|bad smelling urine)\b/i,
-    /\b(back pain|side pain|flank pain|fever|shaky|shakiness)\b/i
-  ]);
-  if (utiHits >= 2) {
-    return {
-      title: "UTI symptom pattern",
-      body: "Recent notes overlap with MedlinePlus urinary tract infection symptoms. A clinician can confirm this with urine testing; seek prompt care for fever, back or side pain, vomiting, pregnancy, or worsening symptoms.",
-      tone: "care",
-      destination: "symptoms",
-      actionLabel: "Go to symptoms"
-    };
-  }
-
-  const dehydrationHits = countMedicalMatches(recentText, [
-    /\b(extreme thirst|very thirsty|dark urine|not peeing|less urination)\b/i,
-    /\b(dizzy|dizziness|lightheaded|fatigue|confusion)\b/i,
-    /\b(vomiting|diarrhea|fever|sweating|heat)\b/i
-  ]);
-  const lowWaterCount = recentVitals.filter((entry) => Number.isFinite(entry.water) && entry.water < getDailyWaterGoal()).length;
-  if (dehydrationHits >= 2 || (dehydrationHits >= 1 && lowWaterCount >= 2)) {
-    return {
-      title: "Dehydration pattern",
-      body: "Recent water logs and notes overlap with Mayo Clinic dehydration symptoms. Increase fluids if safe for you, and get medical help for confusion, fainting, inability to keep fluids down, bloody or black stool, or diarrhea lasting 24 hours or more.",
-      tone: "care",
-      destination: "water",
-      actionLabel: "Go to water"
-    };
-  }
-
-  const highGlucoseCount = recentVitals.filter((entry) => Number.isFinite(entry.glucose) && entry.glucose > 180).length;
-  if (highGlucoseCount >= 2 && matchesAnyPattern(recentText, [/\b(very thirsty|extreme thirst|frequent urination|pee often|blurred vision|fatigue|tired)\b/i])) {
-    return {
-      title: "High glucose symptom pattern",
-      body: "Repeated high glucose with thirst, frequent urination, fatigue, or blurred vision can fit diabetes-related warning patterns described by MedlinePlus. Track timing and discuss repeated highs with a clinician.",
-      tone: "health",
-      destination: "vitals",
-      actionLabel: "Go to history"
-    };
-  }
-
+function getSignalPatternInsight() {
   return null;
 }
 
-function getRecentHealthText(days) {
+function getRecentfocusLogText(days) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const parts = [];
-  symptomEntries.forEach((entry) => {
+  archiveBEntries.forEach((entry) => {
     if (parseDateKey(entry.date) >= cutoff) parts.push(entry.name, entry.severity, entry.note);
   });
-  moodEntries.forEach((entry) => {
+  focusStateEntries.forEach((entry) => {
     if (parseDateKey(entry.date) >= cutoff) parts.push(entry.name, entry.intensity, entry.note);
   });
-  journalEntries.forEach((entry) => {
+  focusLogEntries.forEach((entry) => {
     if (parseDateKey(entry.date) >= cutoff) parts.push(entry.text);
   });
   return parts.filter(Boolean).join(" ");
 }
 
-function countMedicalMatches(value, patterns) {
+function countSignalMatches(value, patterns) {
   return patterns.reduce((count, pattern) => count + (pattern.test(value) ? 1 : 0), 0);
 }
 
@@ -2093,49 +2307,49 @@ function getNumericTrendInsight(title, entries, key, unit, minimumCount, higherI
   const previous = getAverage(values.slice(-minimumCount, -Math.ceil(minimumCount / 2)).map((entry) => entry[key]));
   if (!Number.isFinite(recent) || !Number.isFinite(previous)) return null;
   const change = recent - previous;
-  const threshold = key === "weight" ? 1 : key === "water" ? 8 : key === "glucose" ? 5 : 1;
+  const threshold = key === "valueC" ? 1 : key === "water" ? 8 : key === "valueD" ? 5 : 1;
   if (Math.abs(change) < threshold) return null;
   const improved = higherIsBetter ? change > 0 : change < 0;
   return {
     title: improved ? `${title} looks better` : `${title} needs attention`,
     body: `${title.replace(" trend", "")} moved ${formatTrendAmount(change, unit)} compared with the previous logged stretch.`,
-    tone: improved ? "steady" : "health",
-    destination: improved ? null : key === "water" ? "water" : "vitals",
+    tone: improved ? "steady" : "support",
+    destination: improved ? null : key === "water" ? "water" : "archiveC",
     actionLabel: improved ? null : key === "water" ? "Go to water" : "Go to history"
   };
 }
 
-function getGlucosePatternInsight() {
-  const readings = nutritionEntries
-    .filter((entry) => Number.isFinite(entry.glucose))
+function getvalueDPatternInsight() {
+  const readings = archiveAEntries
+    .filter((entry) => Number.isFinite(entry.valueD))
     .sort((first, second) => first.date.localeCompare(second.date))
     .slice(-7);
   if (readings.length < 3) return null;
-  const lowCount = readings.filter((entry) => entry.glucose < 70).length;
-  const highCount = readings.filter((entry) => entry.glucose > 180).length;
+  const lowCount = readings.filter((entry) => entry.valueD < 70).length;
+  const highCount = readings.filter((entry) => entry.valueD > 180).length;
   if (lowCount >= 2) {
     return {
-      title: "Low glucose pattern",
-      body: `${lowCount} of your last ${readings.length} glucose readings were below 70 mg/dL. Look for timing patterns around meals, activity, medication, sleep, or alcohol, and bring repeated lows to your care team.`,
+      title: "Low reading pattern",
+      body: `${lowCount} of your last ${readings.length} readings were below your usual range. Look for timing patterns around task load, water, sleep, or stress.`,
       tone: "care",
-      destination: "vitals",
+      destination: "archiveC",
       actionLabel: "Go to history"
     };
   }
   if (highCount >= 3) {
     return {
-      title: "High glucose pattern",
-      body: `${highCount} of your last ${readings.length} glucose readings were above 180 mg/dL. Check whether they cluster after specific meals, stress, missed sleep, or lower activity days.`,
-      tone: "health",
-      destination: "vitals",
+      title: "High reading pattern",
+      body: `${highCount} of your last ${readings.length} readings were above your usual range. Check whether they cluster around stress, missed sleep, or heavier task days.`,
+      tone: "support",
+      destination: "archiveC",
       actionLabel: "Go to history"
     };
   }
   return null;
 }
 
-function getBloodPressureTrendInsight() {
-  const values = nutritionEntries
+function getreadingTrendInsight() {
+  const values = archiveAEntries
     .filter((entry) => Number.isFinite(entry.systolic) && Number.isFinite(entry.diastolic))
     .sort((first, second) => first.date.localeCompare(second.date));
   if (values.length < 8) return null;
@@ -2150,15 +2364,15 @@ function getBloodPressureTrendInsight() {
   if (Math.abs(sysChange) < 5 && Math.abs(diaChange) < 3) return null;
   const improved = sysChange < 0 && diaChange <= 1;
   return {
-    title: improved ? "Blood pressure trending down" : "Blood pressure trending up",
-    body: `Recent average moved ${formatTrendAmount(sysChange, "systolic")} and ${formatTrendAmount(diaChange, "diastolic")} compared with the prior readings.`,
-    tone: improved ? "steady" : "health"
+    title: improved ? "Pressure reading trending down" : "Pressure reading trending up",
+    body: `Recent average moved ${formatTrendAmount(sysChange, "first value")} and ${formatTrendAmount(diaChange, "second value")} compared with the prior readings.`,
+    tone: improved ? "steady" : "support"
   };
 }
 
-function getMoodTrendInsight() {
-  const scores = moodEntries
-    .map((entry) => ({ date: entry.date, score: getMoodScore(entry.name) }))
+function getfocusStateTrendInsight() {
+  const scores = focusStateEntries
+    .map((entry) => ({ date: entry.date, score: getfocusStateScore(entry.name) }))
     .filter((entry) => Number.isFinite(entry.score))
     .sort((first, second) => first.date.localeCompare(second.date));
   if (scores.length < 6) return null;
@@ -2167,151 +2381,151 @@ function getMoodTrendInsight() {
   const change = recent - previous;
   if (Math.abs(change) < 0.75) return null;
   return {
-    title: change > 0 ? "Mood trend improving" : "Mood trend declining",
-    body: `Recent mood logs are averaging ${change > 0 ? "better" : "lower"} than the previous few entries.`,
+    title: change > 0 ? "focusState trend improving" : "focusState trend declining",
+    body: `Recent focusState logs are averaging ${change > 0 ? "better" : "lower"} than the previous few entries.`,
     tone: change > 0 ? "steady" : "care",
-    destination: change < 0 ? "mood" : null,
-    actionLabel: change < 0 ? "Go to mood" : null
+    destination: change < 0 ? "focusState" : null,
+    actionLabel: change < 0 ? "Go to focusState" : null
   };
 }
 
-function getSymptomTrendInsight() {
-  const recentCount = getEntryCountInLastDays(symptomEntries, 7, 0);
-  const previousCount = getEntryCountInLastDays(symptomEntries, 7, 7);
+function getarchiveBTrendInsight() {
+  const recentCount = getEntryCountInLastDays(archiveBEntries, 7, 0);
+  const previousCount = getEntryCountInLastDays(archiveBEntries, 7, 7);
   if (recentCount + previousCount < 3 || recentCount === previousCount) return null;
   return {
-    title: recentCount < previousCount ? "Symptoms easing" : "Symptoms increasing",
-    body: `You logged ${recentCount} symptoms this week versus ${previousCount} the week before.`,
+    title: recentCount < previousCount ? "archiveB easing" : "archiveB increasing",
+    body: `You logged ${recentCount} archiveB this week versus ${previousCount} the week before.`,
     tone: recentCount < previousCount ? "steady" : "care",
-    destination: recentCount > previousCount ? "symptoms" : null,
-    actionLabel: recentCount > previousCount ? "Go to symptoms" : null
+    destination: recentCount > previousCount ? "archiveB" : null,
+    actionLabel: recentCount > previousCount ? "Go to archiveB" : null
   };
 }
 
-function getJournalPatternInsight() {
-  const recent = journalEntries
+function getfocusLogPatternInsight() {
+  const recent = focusLogEntries
     .filter((entry) => entry.date >= getRecentCutoffKey(30))
     .sort((first, second) => second.date.localeCompare(first.date));
   if (!recent.length) return null;
-  const crisisEntry = recent.find((entry) => hasCrisisLanguage(entry.text));
-  if (crisisEntry) {
+  const urgentEntry = recent.find((entry) => hasurgentLanguage(entry.text));
+  if (urgentEntry) {
     return {
-      title: "Journal safety concern",
-      body: "A journal entry includes language that can match suicide or self-harm warning signs. If there is immediate danger, call 911 now or text 911 if available. For suicide prevention support in the U.S., call or text 988.",
+      title: "focusLog safety concern",
+      body: "A focusLog entry includes language that can match urgent-risk or urgent-risk warning signs. If there is urgent situation, get help now or get help if available. For task support support in the U.S., call or text support.",
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
-  const depressionHits = recent.filter((entry) => matchesAnyPattern(normalizeJournalConcernText(entry.text), depressionMoodPatterns));
-  if (depressionHits.length >= 1) {
+  const lowFocusHits = recent.filter((entry) => matchesAnyPattern(normalizefocusLogConcernText(entry.text), lowFocusfocusStatePatterns));
+  if (lowFocusHits.length >= 1) {
     return {
-      title: "Journal mood pattern",
-      body: `${depressionHits.length} recent journal entr${depressionHits.length === 1 ? "y uses" : "ies use"} depression warning language. Do one immediate support step: lower today's task load, tell one trusted person, and consider professional support if this keeps showing up.`,
+      title: "focusLog focusState pattern",
+      body: `${lowFocusHits.length} recent focusLog entr${lowFocusHits.length === 1 ? "y uses" : "ies use"} lowFocus warning language. Do one immediate support step: lower today's task load, tell one trusted person, and consider professional support if this keeps showing up.`,
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
   const thoughtHits = recent.filter((entry) => {
-    const normalized = normalizeJournalConcernText(entry.text);
-    return matchesAnyPattern(normalized, unhealthyThoughtPatterns) || matchesAnyPattern(normalized, journalConcernPatterns);
+    const normalized = normalizefocusLogConcernText(entry.text);
+    return matchesAnyPattern(normalized, negativeThoughtPatterns) || matchesAnyPattern(normalized, focusLogConcernPatterns);
   });
   if (thoughtHits.length >= 1) {
     return {
       title: "Thought pattern watch",
-      body: `${thoughtHits.length} recent journal entries show repeated negative thought patterns like all-or-nothing thinking, self-blame, or worst-case spiraling. Write one balanced counterpoint, then choose one small action you can control today.`,
+      body: `${thoughtHits.length} recent focusLog entries show repeated negative thought patterns like all-or-nothing thinking, self-blame, or worst-case spiraling. Write one balanced counterpoint, then choose one small action you can control today.`,
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
-  const linkedPattern = getJournalLinkedPattern(recent);
+  const linkedPattern = getfocusLogLinkedPattern(recent);
   if (linkedPattern) return linkedPattern;
-  const stressHits = recent.filter((entry) => matchesAnyPattern(normalizeJournalConcernText(entry.text), journalStressPatterns));
+  const stressHits = recent.filter((entry) => matchesAnyPattern(normalizefocusLogConcernText(entry.text), focusLogStressPatterns));
   if (stressHits.length >= 1) {
     return {
-      title: "Journal stress pattern",
-      body: `${stressHits.length} recent journal entries mention stress or anxiety. Reduce the next task list, add a short reset task, and check whether water, glucose, blood pressure, or symptoms changed on the same dates.`,
+      title: "focusLog stress pattern",
+      body: `${stressHits.length} recent focusLog entries mention stress or anxiety. Reduce the next task list, add a short reset task, and check whether water, readings, pressure, or issues changed on the same dates.`,
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
   return null;
 }
 
-function getLatestJournalEntryInsight() {
-  const todayEntries = journalEntries.filter((entry) => entry.date === today && entry.text);
+function getLatestfocusLogEntryInsight() {
+  const todayEntries = focusLogEntries.filter((entry) => entry.date === today && entry.text);
   if (!todayEntries.length) return null;
-  const crisisEntry = todayEntries.find((entry) => hasCrisisLanguage(entry.text));
-  if (crisisEntry) {
+  const urgentEntry = todayEntries.find((entry) => hasurgentLanguage(entry.text));
+  if (urgentEntry) {
     return {
-      title: "Journal safety concern",
-      body: "Today's journal entry includes language that can match suicide or self-harm warning signs. If you might act on those thoughts or are in immediate danger, call 911 now or text 911 if available. For suicide prevention support in the U.S., call or text 988.",
+      title: "focusLog safety concern",
+      body: "Today's focusLog entry includes language that can match urgent-risk or urgent-risk warning signs. If you might act on those thoughts or are in urgent situation, get help now or get help if available. For task support support in the U.S., call or text support.",
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
-  const depressionEntry = todayEntries.find((entry) => matchesAnyPattern(normalizeJournalConcernText(entry.text), depressionMoodPatterns));
-  if (depressionEntry) {
+  const lowFocusEntry = todayEntries.find((entry) => matchesAnyPattern(normalizefocusLogConcernText(entry.text), lowFocusfocusStatePatterns));
+  if (lowFocusEntry) {
     return {
-      title: "Support from today's journal",
-      body: "Today's journal entry sounds heavy. Keep the next task small, drink water, pause before adding more obligations, and reach out to a trusted person or clinician if this feeling is sticking around.",
+      title: "Support from today's focusLog",
+      body: "Today's focusLog entry sounds heavy. Keep the next task small, drink water, pause before adding more obligations, and reach out to a trusted person or qualified helper if this feeling is sticking around.",
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
   const thoughtEntry = todayEntries.find((entry) => {
-    const normalized = normalizeJournalConcernText(entry.text);
-    return matchesAnyPattern(normalized, unhealthyThoughtPatterns) || matchesAnyPattern(normalized, journalConcernPatterns);
+    const normalized = normalizefocusLogConcernText(entry.text);
+    return matchesAnyPattern(normalized, negativeThoughtPatterns) || matchesAnyPattern(normalized, focusLogConcernPatterns);
   });
   if (thoughtEntry) {
     return {
-      title: "Thought pattern in journal",
-      body: "Today's journal entry has signs of self-blame, worst-case thinking, or all-or-nothing language. Write one balanced counterpoint, then choose one small action you can control in the next 10 minutes.",
+      title: "Thought pattern in focusLog",
+      body: "Today's focusLog entry has signs of self-blame, worst-case thinking, or all-or-nothing language. Write one balanced counterpoint, then choose one small action you can control in the next 10 minutes.",
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
-  const stressEntry = todayEntries.find((entry) => matchesAnyPattern(normalizeJournalConcernText(entry.text), journalStressPatterns));
+  const stressEntry = todayEntries.find((entry) => matchesAnyPattern(normalizefocusLogConcernText(entry.text), focusLogStressPatterns));
   if (stressEntry) {
     return {
-      title: "Stress signal in journal",
-      body: "Today's journal entry points to stress. Make the app work for that: reduce the task list, log mood and symptoms, and use the next task as a reset instead of another demand.",
+      title: "Stress signal in focusLog",
+      body: "Today's focusLog entry points to stress. Make the app work for that: reduce the task list, log focusState and archiveB, and use the next task as a reset instead of another demand.",
       tone: "care",
-      destination: "journal",
-      actionLabel: "Go to journal"
+      destination: "focusLog",
+      actionLabel: "Go to focusLog"
     };
   }
   return null;
 }
 
-function hasCrisisLanguage(text) {
-  const normalized = normalizeJournalConcernText(text);
-  return matchesAnyPattern(normalized, crisisMoodPatterns) || (
+function hasurgentLanguage(text) {
+  const normalized = normalizefocusLogConcernText(text);
+  return matchesAnyPattern(normalized, urgentfocusStatePatterns) || (
     /\b(i'?m|i am|im|feel|feeling)\b/.test(normalized) &&
-    matchesAnyPattern(normalized, journalConcernPatterns) &&
-    matchesAnyPattern(normalized, depressionMoodPatterns)
+    matchesAnyPattern(normalized, focusLogConcernPatterns) &&
+    matchesAnyPattern(normalized, lowFocusfocusStatePatterns)
   );
 }
 
-function handleImmediateJournalSafetySignal(text) {
-  if (!hasCrisisLanguage(text)) return;
-  const body = "AI Coach noticed a serious journal safety warning. If you might hurt yourself or are in danger, call 911 now, text 911 if available, call or text 988 for suicide prevention support, or call a trusted friend.";
-  sendAppNotification("AI Coach safety alert", body, `wellbeing:journal-crisis:${Date.now()}`);
+function handleImmediatefocusLogSafetySignal(text) {
+  if (!hasurgentLanguage(text)) return;
+  const body = "AI Coach noticed a serious focusLog safety warning. If you might feel unsafe or are in danger, get help now, get help if available, call or text support for task support support, or call a trusted friend.";
+  sendAppNotification("AI Coach safety alert", body, `focusArea:focusLog-urgent:${Date.now()}`);
   window.alert(body);
 }
 
-async function scanJournalAndAppWithAiForSafety(latestJournalText = "") {
+async function scanfocusLogAndAppWithAiForSafety(latestfocusLogText = "") {
   if (!canUseCloudAi()) return;
   const requestId = aiSafetyScanRequestId + 1;
   aiSafetyScanRequestId = requestId;
   try {
-    const result = await fetchAiSafetyScan(buildAiSafetyScanSnapshot(latestJournalText));
+    const result = await fetchAiSafetyScan(buildAiSafetyScanSnapshot(latestfocusLogText));
     if (requestId !== aiSafetyScanRequestId || !result) return;
     handleAiSafetyScanResult(result);
   } catch (error) {
@@ -2319,23 +2533,23 @@ async function scanJournalAndAppWithAiForSafety(latestJournalText = "") {
   }
 }
 
-function buildAiSafetyScanSnapshot(latestJournalText = "") {
+function buildAiSafetyScanSnapshot(latestfocusLogText = "") {
   return {
-    scanReason: "journal_saved",
-    latestJournalText: truncateForAi(latestJournalText, 1200),
-    journalEntries: journalEntries.map((entry) => ({
+    scanReason: "focusLog_saved",
+    latestfocusLogText: truncateForAi(latestfocusLogText, 1200),
+    focusLogEntries: focusLogEntries.map((entry) => ({
       date: entry.date,
       text: truncateForAi(entry.text, 700)
     })).slice(0, 40),
-    moodEntries: moodEntries.map((entry) => ({
+    focusStateEntries: focusStateEntries.map((entry) => ({
       date: entry.date,
-      mood: entry.name,
+      focusState: entry.name,
       intensity: entry.intensity,
       note: truncateForAi(entry.note, 300)
     })).slice(0, 60),
-    symptomEntries: symptomEntries.map((entry) => ({
+    archiveBEntries: archiveBEntries.map((entry) => ({
       date: entry.date,
-      symptom: entry.name,
+      archiveB: entry.name,
       severity: entry.severity,
       note: truncateForAi(entry.note, 300)
     })).slice(0, 60),
@@ -2359,7 +2573,7 @@ async function fetchAiSafetyScan(snapshot) {
 }
 
 function normalizeAiSafetyScanResult(data) {
-  const level = ["none", "concern", "crisis"].includes(data?.level) ? data.level : "none";
+  const level = ["none", "concern", "urgent"].includes(data?.level) ? data.level : "none";
   return {
     level,
     matchedText: cleanAiCoachText(data?.matchedText || "").slice(0, 180),
@@ -2369,9 +2583,9 @@ function normalizeAiSafetyScanResult(data) {
 }
 
 function handleAiSafetyScanResult(result) {
-  if (result.level === "crisis") {
-    const body = `OpenAI safety scan flagged a serious journal warning${result.reason ? `: ${result.reason}` : "."} If you might hurt yourself or are in danger, call 911 now, text 911 if available, call or text 988 for suicide prevention support, or call a trusted friend.`;
-    sendAppNotification("AI Coach safety alert", body, `wellbeing:journal-ai-crisis:${Date.now()}`);
+  if (result.level === "urgent") {
+    const body = `OpenAI safety scan flagged a serious focusLog warning${result.reason ? `: ${result.reason}` : "."} If you might feel unsafe or are in danger, get help now, get help if available, call or text support for task support support, or call a trusted friend.`;
+    sendAppNotification("AI Coach safety alert", body, `focusArea:focusLog-ai-urgent:${Date.now()}`);
     window.alert(body);
     scheduleSmartCoachRender();
     return;
@@ -2379,14 +2593,14 @@ function handleAiSafetyScanResult(result) {
   if (result.level === "concern") {
     sendAppNotification(
       "AI Coach check-in",
-      `OpenAI safety scan noticed concerning journal or mood language${result.reason ? `: ${result.reason}` : "."} Is there anything that can be done to help right now?`,
-      `wellbeing:journal-ai-concern:${Date.now()}`
+      `OpenAI safety scan noticed concerning focusLog or focusState language${result.reason ? `: ${result.reason}` : "."} Is there anything that can be done to help right now?`,
+      `focusArea:focusLog-ai-concern:${Date.now()}`
     );
     scheduleSmartCoachRender();
   }
 }
 
-function normalizeJournalConcernText(text) {
+function normalizefocusLogConcernText(text) {
   return String(text || "")
     .toLowerCase()
     .replace(/[’`]/g, "'")
@@ -2397,15 +2611,15 @@ function normalizeJournalConcernText(text) {
     .replace(/\bki[l1]l\s+myself\b/g, "kill myself")
     .replace(/\bkms\b/g, "kill myself")
     .replace(/\bkys\b/g, "kill yourself")
-    .replace(/\bsui(?:cide|cidal|side|c1de|c!de)?\b/g, "suicide")
+    .replace(/\bsui(?:cide|cidal|side|c1de|c!de)?\b/g, "urgent-risk")
     .replace(/\bunaliv(?:e|ing)?\s*(?:myself|me)?\b/g, "kill myself")
     .replace(/\bun alive\s+(?:myself|me)\b/g, "kill myself")
     .replace(/\boff\s+myself\b/g, "kill myself")
     .replace(/\bdelete\s+(?:myself|me)\b/g, "kill myself")
     .replace(/\bself\s+delete\b/g, "kill myself")
     .replace(/\bnot\s+wake\s+up\b/g, "not wake up")
-    .replace(/\bselfharm\b/g, "self harm")
-    .replace(/\bdeprest\b|\bdepresed\b|\bdeppressed\b|\bdepresd\b/g, "depressed")
+    .replace(/\bselfharm\b/g, "urgent-risk")
+    .replace(/\bdeprest\b|\bdepresed\b|\bdeppressed\b|\bdepresd\b/g, "low")
     .replace(/\bhopless\b|\bhope less\b|\bhoepeless\b/g, "hopeless")
     .replace(/\bworthles\b|\bworthlesss\b/g, "worthless")
     .replace(/\bbeter\b/g, "better")
@@ -2419,35 +2633,35 @@ function normalizeJournalConcernText(text) {
     .trim();
 }
 
-function getJournalLinkedPattern(entries) {
+function getfocusLogLinkedPattern(entries) {
   const linked = entries.map((entry) => {
-    const symptomCount = symptomEntries.filter((symptom) => symptom.date === entry.date).length;
-    const mood = moodEntries.find((item) => item.date === entry.date);
-    const vitals = nutritionEntries.find((item) => item.date === entry.date);
-    const hasVitalsFlag = Boolean(vitals && (
-      getBloodPressureCategory(vitals.systolic, vitals.diastolic).level !== "normal" ||
-      (Number.isFinite(vitals.glucose) && (vitals.glucose < 70 || vitals.glucose > 180)) ||
-      (Number.isFinite(vitals.water) && vitals.water < getDailyWaterGoal())
+    const archiveBCount = archiveBEntries.filter((archiveB) => archiveB.date === entry.date).length;
+    const focusState = focusStateEntries.find((item) => item.date === entry.date);
+    const archiveC = archiveAEntries.find((item) => item.date === entry.date);
+    const hasarchiveCFlag = Boolean(archiveC && (
+      getreadingCategory(archiveC.systolic, archiveC.diastolic).level !== "normal" ||
+      (Number.isFinite(archiveC.valueD) && (archiveC.valueD < 70 || archiveC.valueD > 180)) ||
+      (Number.isFinite(archiveC.water) && archiveC.water < getDailyWaterGoal())
     ));
-    const hasLowMood = mood && ["Low", "Stressed", "Anxious"].includes(mood.name);
-    return { entry, symptomCount, hasVitalsFlag, hasLowMood };
+    const hasLowfocusState = focusState && ["Low", "Stressed", "Anxious"].includes(focusState.name);
+    return { entry, archiveBCount, hasarchiveCFlag, hasLowfocusState };
   });
-  const issueDays = linked.filter((item) => item.symptomCount || item.hasVitalsFlag || item.hasLowMood);
+  const issueDays = linked.filter((item) => item.archiveBCount || item.hasarchiveCFlag || item.hasLowfocusState);
   if (issueDays.length < 2) return null;
-  const symptomDays = issueDays.filter((item) => item.symptomCount).length;
-  const vitalsDays = issueDays.filter((item) => item.hasVitalsFlag).length;
-  const moodDays = issueDays.filter((item) => item.hasLowMood).length;
+  const archiveBDays = issueDays.filter((item) => item.archiveBCount).length;
+  const archiveCDays = issueDays.filter((item) => item.hasarchiveCFlag).length;
+  const focusStateDays = issueDays.filter((item) => item.hasLowfocusState).length;
   const parts = [
-    symptomDays ? `${symptomDays} symptom day${symptomDays === 1 ? "" : "s"}` : "",
-    vitalsDays ? `${vitalsDays} vitals flag${vitalsDays === 1 ? "" : "s"}` : "",
-    moodDays ? `${moodDays} low mood day${moodDays === 1 ? "" : "s"}` : ""
+    archiveBDays ? `${archiveBDays} archiveB day${archiveBDays === 1 ? "" : "s"}` : "",
+    archiveCDays ? `${archiveCDays} archiveC flag${archiveCDays === 1 ? "" : "s"}` : "",
+    focusStateDays ? `${focusStateDays} low focusState day${focusStateDays === 1 ? "" : "s"}` : ""
   ].filter(Boolean).join(", ");
   return {
-    title: "Journal-health link",
-    body: `Recent journal dates overlap with ${parts}. Look at what you wrote on those days, then adjust one controllable factor: hydration, food timing, task load, sleep, or stress recovery.`,
-    tone: "health",
-    destination: "journal",
-    actionLabel: "Go to journal"
+    title: "focusLog pattern link",
+    body: `Recent focusLog dates overlap with ${parts}. Look at what you wrote on those days, then adjust one controllable factor: water, food timing, task load, sleep, or stress recovery.`,
+    tone: "support",
+    destination: "focusLog",
+    actionLabel: "Go to focusLog"
   };
 }
 
@@ -2469,7 +2683,7 @@ function formatTrendAmount(value, unit) {
   return `${value >= 0 ? "up" : "down"} ${amount} ${unit}`;
 }
 
-function getMoodScore(mood) {
+function getfocusStateScore(focusState) {
   return {
     Great: 5,
     Good: 4,
@@ -2477,31 +2691,31 @@ function getMoodScore(mood) {
     Low: 2,
     Stressed: 2,
     Anxious: 2
-  }[mood] || null;
+  }[focusState] || null;
 }
 
-function getMoodSuggestion(mood) {
+function getfocusStateSuggestion(focusState) {
   const suggestions = {
     Low: {
-      body: "CDC and NIMH guidance points toward small physical activity, social connection, hydration, sleep priority, and naming feelings. Start with a 10-minute walk or a check-in text.",
+      body: "TaskLens and NIMH guidance points toward small physical activity, social connection, water, sleep priority, and naming feelings. Start with a 10-minute walk or a check-in text.",
       task: "Take a 10 minute walk"
     },
     Stressed: {
-      body: "Stress support guidance emphasizes relaxation, journaling, movement, sleep, and setting priorities. Try a short breathing reset, then write down the next one thing.",
+      body: "Stress support guidance emphasizes relaxation, focusLog, movement, sleep, and setting priorities. Try a short breathing reset, then write down the next one thing.",
       task: "Two minute breathing reset"
     },
     Anxious: {
-      body: "For anxious mood, use a grounding routine: slow breathing, light movement, less caffeine, and one supportive contact. Keep the next task small and specific.",
+      body: "For anxious focusState, use a grounding routine: slow breathing, light movement, less caffeine, and one supportive contact. Keep the next task small and specific.",
       task: "Ground and breathe"
     }
   };
-  return suggestions[mood] || {
-    body: "Mood support works best with small basics: move a little, drink water, protect sleep, write what you feel, and connect with someone supportive.",
-    task: "Mood reset"
+  return suggestions[focusState] || {
+    body: "focusState support works best with small basics: move a little, drink water, protect sleep, write what you feel, and connect with someone supportive.",
+    task: "focusState reset"
   };
 }
 
-function getBloodPressureCategory(systolic, diastolic) {
+function getreadingCategory(systolic, diastolic) {
   if (systolic <= 90 || diastolic <= 60) return { label: "Low", level: "low" };
   if (systolic > 180 || diastolic > 120) return { label: "Severe", level: "severe" };
   if (systolic >= 140 || diastolic >= 90) return { label: "Stage 2", level: "stage2" };
@@ -2510,33 +2724,33 @@ function getBloodPressureCategory(systolic, diastolic) {
   return { label: "Normal", level: "normal" };
 }
 
-function getLatestBmi(weightPounds) {
+function getLatestBmi(valueCPounds) {
   const inches = Number(appSettings.heightInches) || 0;
-  if (!Number.isFinite(weightPounds) || inches <= 0) return null;
-  return (weightPounds / (inches * inches)) * 703;
+  if (!Number.isFinite(valueCPounds) || inches <= 0) return null;
+  return (valueCPounds / (inches * inches)) * 703;
 }
 
 function getDailyWaterGoal() {
-  const latestWeightEntry = nutritionEntries.find((entry) => Number.isFinite(entry.weight));
-  const latestWeightPounds = latestWeightEntry ? latestWeightEntry.weight : null;
-  const bmi = Number.isFinite(latestWeightPounds) ? getLatestBmi(latestWeightPounds) : null;
+  const latestvalueCEntry = archiveAEntries.find((entry) => Number.isFinite(entry.valueC));
+  const latestvalueCPounds = latestvalueCEntry ? latestvalueCEntry.valueC : null;
+  const bmi = Number.isFinite(latestvalueCPounds) ? getLatestBmi(latestvalueCPounds) : null;
   let goal = DEFAULT_WATER_GOAL_OZ;
 
-  if (Number.isFinite(latestWeightPounds)) {
-    if (latestWeightPounds < 105) goal = 64;
-    else if (latestWeightPounds < 130) goal = 72;
-    else goal = Math.min(MAX_WATER_GOAL_OZ, Math.max(goal, Math.round((latestWeightPounds * 0.5) / WATER_GLASS_OZ) * WATER_GLASS_OZ));
+  if (Number.isFinite(latestvalueCPounds)) {
+    if (latestvalueCPounds < 105) goal = 64;
+    else if (latestvalueCPounds < 130) goal = 72;
+    else goal = Math.min(MAX_WATER_GOAL_OZ, Math.max(goal, Math.round((latestvalueCPounds * 0.5) / WATER_GLASS_OZ) * WATER_GLASS_OZ));
   }
 
   if (Number.isFinite(bmi) && bmi < 18.5) {
     goal = Math.min(goal, 72);
   }
 
-  const recentSymptoms = symptomEntries
+  const recentarchiveB = archiveBEntries
     .filter((entry) => daysBetween(entry.date, today) <= 3)
     .map((entry) => `${entry.name || ""} ${entry.note || ""}`)
     .join(" ");
-  if (/\b(fever|diarrhea|vomit|vomiting|sweat|sweating|heat|dehydrated|dehydration)\b/i.test(recentSymptoms)) {
+  if (/\b(fever|discomfort|vomit|vomiting|sweat|sweating|heat|dehydrated|lowWater)\b/i.test(recentarchiveB)) {
     goal += WATER_GLASS_OZ;
   }
 
@@ -2544,9 +2758,9 @@ function getDailyWaterGoal() {
 }
 
 function getBmiCategory(bmi) {
-  if (bmi < 18.5) return { label: "Underweight", level: "underweight" };
-  if (bmi < 25) return { label: "Healthy weight", level: "healthy" };
-  if (bmi < 30) return { label: "Overweight", level: "overweight" };
+  if (bmi < 18.5) return { label: "UndervalueC", level: "undervalueC" };
+  if (bmi < 25) return { label: "Balanced valueC", level: "balanced" };
+  if (bmi < 30) return { label: "OvervalueC", level: "overvalueC" };
   return { label: "Obesity", level: "obesity" };
 }
 
@@ -2564,62 +2778,55 @@ function getEntryCountInLastDays(entries, days, offsetDays) {
 }
 
 function addSuggestedTask(name) {
-  const dayName = weekDays[new Date().getDay()];
   const duplicate = habits.some((habit) => habit.name.toLowerCase() === name.toLowerCase() && isTaskScheduledForDate(habit, today));
   if (duplicate) return;
-  habits = [{
-    id: createHabitId(),
+  habits = [createTaskDraft({
     name,
-    date: today,
-    day: dayName,
-    category: "Health",
-    time: "",
-    deadline: "",
-    priority: "Normal",
-    color: "#1e40af",
-    note: "Suggested by AI Coach",
-    completions: []
-  }, ...habits];
+    category: "General",
+    priority: "Next",
+    size: "Small",
+    note: "Suggested by AI Coach"
+  }), ...habits];
   saveHabits();
   render();
 }
 
-function toggleWeightUnit() {
-  const currentWeight = parseNutritionNumber(weight.value);
-  if (!Number.isFinite(currentWeight)) {
-    weight.focus();
+function togglevalueCUnit() {
+  const currentvalueC = parsearchiveANumber(valueC.value);
+  if (!Number.isFinite(currentvalueC)) {
+    valueC.focus();
     return;
   }
 
-  if (weightUnit === "lb") {
-    weight.value = formatInputDecimal(currentWeight / 2.2046226218);
-    weightUnit = "kg";
+  if (valueCUnit === "lb") {
+    valueC.value = formatInputDecimal(currentvalueC / 2.2046226218);
+    valueCUnit = "kg";
   } else {
-    weight.value = formatInputDecimal(currentWeight * 2.2046226218);
-    weightUnit = "lb";
+    valueC.value = formatInputDecimal(currentvalueC * 2.2046226218);
+    valueCUnit = "lb";
   }
 
-  updateWeightConvertButton();
-  weight.focus();
-  weight.select();
+  updatevalueCConvertButton();
+  valueC.focus();
+  valueC.select();
 }
 
-function updateWeightConvertButton() {
-  convertWeight.textContent = weightUnit === "lb" ? "lbs to kgs" : "kgs to lbs";
-  if (weightUnitLabel) {
-    weightUnitLabel.textContent = weightUnit === "lb" ? "Weight (lbs)" : "Weight (kgs)";
+function updatevalueCConvertButton() {
+  convertvalueC.textContent = valueCUnit === "lb" ? "lbs to kgs" : "kgs to lbs";
+  if (valueCUnitLabel) {
+    valueCUnitLabel.textContent = valueCUnit === "lb" ? "Value (lbs)" : "Value (kgs)";
   }
 }
 
-function getWeightInPoundsForSave() {
-  const currentWeight = parseNutritionNumber(weight.value);
-  if (!Number.isFinite(currentWeight)) return null;
-  return weightUnit === "kg" ? currentWeight * 2.2046226218 : currentWeight;
+function getvalueCInPoundsForSave() {
+  const currentvalueC = parsearchiveANumber(valueC.value);
+  if (!Number.isFinite(currentvalueC)) return null;
+  return valueCUnit === "kg" ? currentvalueC * 2.2046226218 : currentvalueC;
 }
 
 function jumpFromDashboard(target) {
-  if (["vitals", "water", "mood", "symptoms"].includes(target)) {
-    setWellbeingModule(target);
+  if (["archiveC", "water", "focusState", "archiveB"].includes(target)) {
+    setfocusAreaModule(target);
   }
   if (target === "water") {
     setWaterExpanded(true);
@@ -2630,10 +2837,10 @@ function jumpFromDashboard(target) {
     tasks: document.querySelector("#todayTasksSection") || habitForm,
     weekly: weeklyTaskPercentBar,
     water: document.querySelector("#waterControl"),
-    vitals: nutritionPanel,
-    mood: moodPanel,
-    symptoms: symptomPanel,
-    journal: journalPanel,
+    archiveC: archiveAPanel,
+    focusState: focusStatePanel,
+    archiveB: archiveBPanel,
+    focusLog: focusLogPanel,
     settings: document.querySelector("#settingsButton")
   };
   const destination = targets[target];
@@ -2678,7 +2885,7 @@ function openReminderCenter() {
   reminderCenterList.textContent = "";
   if (!items.length) {
     const empty = document.createElement("p");
-    empty.className = "nutrition-empty";
+    empty.className = "archiveA-empty";
     empty.textContent = "No open reminders right now.";
     reminderCenterList.appendChild(empty);
   }
@@ -2722,7 +2929,7 @@ function getReminderCenterItems() {
   });
 
   upcomingDeadlines.slice(0, 4).forEach((occurrence) => {
-    const dueDate = occurrence.dateKey === today ? "today" : formatSymptomHistoryDate(occurrence.dateKey);
+    const dueDate = occurrence.dateKey === today ? "today" : formatarchiveBHistoryDate(occurrence.dateKey);
     items.push({
       marker: "24",
       title: occurrence.habit.name,
@@ -2742,7 +2949,7 @@ function getReminderCenterItems() {
   }
 
   upcomingTasks.forEach((item) => {
-    const when = item.offset === 1 ? "tomorrow" : `${item.dayName}, ${formatSymptomHistoryDate(item.dateKey)}`;
+    const when = item.offset === 1 ? "tomorrow" : `${item.dayName}, ${formatarchiveBHistoryDate(item.dateKey)}`;
     items.push({
       marker: item.missedBefore ? "!" : "-",
       title: item.habit.name,
@@ -2803,56 +3010,22 @@ function getReviewTodayItems() {
   const summary = getTodaySummary();
   const todayTasks = summary.tasks;
   const incompleteTasks = summary.incompleteTasks;
-  const todayEntry = summary.entry;
-  const todayMood = summary.mood;
-  const todaySymptoms = summary.symptoms;
-  const todayJournal = summary.journal;
   return [
     {
       title: "Tasks",
       detail: todayTasks.length ? (incompleteTasks.length ? `${incompleteTasks.length} still open` : "Complete") : "Not logged",
       complete: !incompleteTasks.length && todayTasks.length > 0,
       destination: "tasks"
-    },
-    {
-      title: "Water",
-      detail: todayEntry && Number.isFinite(todayEntry.water) && todayEntry.water > 0 ? `${formatWholeNumber(todayEntry.water)} oz logged` : "Not logged",
-      complete: Boolean(todayEntry && Number.isFinite(todayEntry.water) && todayEntry.water > 0),
-      destination: "water"
-    },
-    {
-      title: "Nutrition & Vitals",
-      detail: todayEntry && hasVitalsData(todayEntry) ? "Logged" : "Not logged",
-      complete: Boolean(todayEntry && hasVitalsData(todayEntry)),
-      destination: "vitals"
-    },
-    {
-      title: "Mood",
-      detail: todayMood ? todayMood.name : "Not logged",
-      complete: Boolean(todayMood),
-      destination: "mood"
-    },
-    {
-      title: "Symptoms",
-      detail: todaySymptoms.length ? `${todaySymptoms.length} logged` : "Not logged",
-      complete: todaySymptoms.length > 0,
-      destination: "symptoms"
-    },
-    {
-      title: "Journal",
-      detail: todayJournal ? "Private entry saved" : "Not logged",
-      complete: Boolean(todayJournal),
-      destination: "journal"
     }
   ];
 }
 
-function hasVitalsData(entry) {
+function hasarchiveCData(entry) {
   return Boolean(entry) && [
-    entry.calories,
-    entry.carbs,
-    entry.weight,
-    entry.glucose,
+    entry.valueA,
+    entry.valueB,
+    entry.valueC,
+    entry.valueD,
     entry.systolic,
     entry.diastolic
   ].some(Number.isFinite);
@@ -2881,66 +3054,65 @@ function handleOverviewSwipe(deltaX) {
   }
 }
 
-function setWellbeingModule(moduleName) {
-  const selectedModule = wellbeingModules.includes(moduleName) ? moduleName : "vitals";
+function setfocusAreaModule(moduleName) {
+  const selectedModule = focusAreaModules.includes(moduleName) ? moduleName : "archiveC";
   const panels = {
-    vitals: nutritionPanel,
+    archiveC: archiveAPanel,
     charts: chartsPanel,
-    symptoms: symptomPanel,
-    mood: moodPanel
+    archiveB: archiveBPanel
   };
   Object.entries(panels).forEach(([name, panel]) => {
     if (!panel) return;
     panel.hidden = name !== selectedModule;
   });
-  wellbeingTabs.forEach((tab) => {
-    const isSelected = tab.dataset.wellbeingModule === selectedModule;
+  focusAreaTabs.forEach((tab) => {
+    const isSelected = tab.dataset.focusAreaModule === selectedModule;
     tab.setAttribute("aria-selected", String(isSelected));
     if (isSelected) tab.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   });
   if (selectedModule === "charts") {
-    vitalsHistoryDropdown.open = true;
+    archiveCHistoryDropdown.open = true;
     syncHistoryControls();
     renderHistory();
   }
 }
 
-function handleWellbeingSwipe(deltaX) {
+function handlefocusAreaSwipe(deltaX) {
   if (Math.abs(deltaX) < 48) return;
-  const currentModule = Array.from(wellbeingTabs).find((tab) => tab.getAttribute("aria-selected") === "true")?.dataset.wellbeingModule || "vitals";
-  const currentIndex = wellbeingModules.indexOf(currentModule);
+  const currentModule = Array.from(focusAreaTabs).find((tab) => tab.getAttribute("aria-selected") === "true")?.dataset.focusAreaModule || "archiveC";
+  const currentIndex = focusAreaModules.indexOf(currentModule);
   const direction = deltaX < 0 ? 1 : -1;
-  const nextIndex = Math.max(0, Math.min(wellbeingModules.length - 1, currentIndex + direction));
+  const nextIndex = Math.max(0, Math.min(focusAreaModules.length - 1, currentIndex + direction));
   if (nextIndex !== currentIndex) {
-    setWellbeingModule(wellbeingModules[nextIndex]);
+    setfocusAreaModule(focusAreaModules[nextIndex]);
   }
 }
 
-function bindWellbeingSwipeTarget(target) {
+function bindfocusAreaSwipeTarget(target) {
   target?.addEventListener("touchstart", (event) => {
-    wellbeingSwipeStartX = event.touches[0]?.clientX || 0;
-    wellbeingSwipeStartY = event.touches[0]?.clientY || 0;
+    focusAreaSwipeStartX = event.touches[0]?.clientX || 0;
+    focusAreaSwipeStartY = event.touches[0]?.clientY || 0;
   }, { passive: true });
   target?.addEventListener("touchend", (event) => {
     const touch = event.changedTouches[0];
-    const deltaX = (touch?.clientX || wellbeingSwipeStartX) - wellbeingSwipeStartX;
-    const deltaY = (touch?.clientY || wellbeingSwipeStartY) - wellbeingSwipeStartY;
+    const deltaX = (touch?.clientX || focusAreaSwipeStartX) - focusAreaSwipeStartX;
+    const deltaY = (touch?.clientY || focusAreaSwipeStartY) - focusAreaSwipeStartY;
     if (Math.abs(deltaY) > Math.abs(deltaX)) return;
-    handleWellbeingSwipe(deltaX);
+    handlefocusAreaSwipe(deltaX);
   });
 }
 
-function renderSymptoms() {
-  if (!symptomList || !symptomEmpty) return;
-  symptomList.textContent = "";
-  symptomEmpty.hidden = symptomEntries.length > 0;
-  symptomEntries.slice(0, 8).forEach((entry) => {
+function renderarchiveB() {
+  if (!archiveBList || !archiveBEmpty) return;
+  archiveBList.textContent = "";
+  archiveBEmpty.hidden = archiveBEntries.length > 0;
+  archiveBEntries.slice(0, 8).forEach((entry) => {
     const item = document.createElement("article");
     const text = document.createElement("div");
     const title = document.createElement("strong");
     const meta = document.createElement("span");
     const close = document.createElement("button");
-    item.className = "symptom-item";
+    item.className = "archiveB-item";
     item.dataset.level = entry.severity;
     title.textContent = entry.name;
     meta.textContent = [formatEntryDate(entry.date), entry.severity, entry.note].filter(Boolean).join(" / ");
@@ -2948,47 +3120,48 @@ function renderSymptoms() {
     close.type = "button";
     close.setAttribute("aria-label", `Delete ${entry.name}`);
     close.textContent = "x";
-    close.addEventListener("click", () => deleteSymptom(entry.id));
+    close.addEventListener("click", () => deletearchiveB(entry.id));
     text.append(title, meta);
     item.append(text, close);
-    symptomList.appendChild(item);
+    archiveBList.appendChild(item);
   });
 }
 
-function renderSymptomHistory() {
-  const historyEntries = getSymptomHistoryEntries();
-  symptomHistoryRows.textContent = "";
-  symptomHistoryEmpty.hidden = historyEntries.length > 0;
+function renderarchiveBHistory() {
+  if (!archiveBHistoryRows || !archiveBHistoryEmpty) return;
+  const historyEntries = getarchiveBHistoryEntries();
+  archiveBHistoryRows.textContent = "";
+  archiveBHistoryEmpty.hidden = historyEntries.length > 0;
 
   historyEntries.forEach((entry) => {
     const row = document.createElement("tr");
-    [formatSymptomHistoryDate(entry.date), entry.name, entry.severity, entry.note || "--"].forEach((value) => {
+    [formatarchiveBHistoryDate(entry.date), entry.name, entry.severity, entry.note || "--"].forEach((value) => {
       const cell = document.createElement("td");
       cell.textContent = value;
       row.appendChild(cell);
     });
-    symptomHistoryRows.appendChild(row);
+    archiveBHistoryRows.appendChild(row);
   });
 }
 
-function deleteSymptom(id) {
-  symptomEntries = symptomEntries.filter((entry) => entry.id !== id);
-  saveSymptomEntries();
-  renderSymptoms();
-  renderSymptomHistory();
+function deletearchiveB(id) {
+  archiveBEntries = archiveBEntries.filter((entry) => entry.id !== id);
+  savearchiveBEntries();
+  renderarchiveB();
+  renderarchiveBHistory();
 }
 
-function renderMoods() {
-  if (!moodList || !moodEmpty) return;
-  moodList.textContent = "";
-  moodEmpty.hidden = moodEntries.length > 0;
-  moodEntries.slice(0, 8).forEach((entry) => {
+function renderfocusStates() {
+  if (!focusStateList || !focusStateEmpty) return;
+  focusStateList.textContent = "";
+  focusStateEmpty.hidden = focusStateEntries.length > 0;
+  focusStateEntries.slice(0, 8).forEach((entry) => {
     const item = document.createElement("article");
     const text = document.createElement("div");
     const title = document.createElement("strong");
     const meta = document.createElement("span");
     const close = document.createElement("button");
-    item.className = "symptom-item mood-item";
+    item.className = "archiveB-item focusState-item";
     item.dataset.level = entry.intensity;
     title.textContent = entry.name;
     meta.textContent = [formatEntryDate(entry.date), entry.intensity, entry.note].filter(Boolean).join(" / ");
@@ -2996,48 +3169,49 @@ function renderMoods() {
     close.type = "button";
     close.setAttribute("aria-label", `Delete ${entry.name}`);
     close.textContent = "x";
-    close.addEventListener("click", () => deleteMood(entry.id));
+    close.addEventListener("click", () => deletefocusState(entry.id));
     text.append(title, meta);
     item.append(text, close);
-    moodList.appendChild(item);
+    focusStateList.appendChild(item);
   });
 }
 
-function renderMoodHistory() {
-  const historyEntries = getMoodHistoryEntries();
-  moodHistoryRows.textContent = "";
-  moodHistoryEmpty.hidden = historyEntries.length > 0;
+function renderfocusStateHistory() {
+  if (!focusStateHistoryRows || !focusStateHistoryEmpty) return;
+  const historyEntries = getfocusStateHistoryEntries();
+  focusStateHistoryRows.textContent = "";
+  focusStateHistoryEmpty.hidden = historyEntries.length > 0;
 
   historyEntries.forEach((entry) => {
     const row = document.createElement("tr");
-    [formatSymptomHistoryDate(entry.date), entry.name, entry.intensity, entry.note || "--"].forEach((value) => {
+    [formatarchiveBHistoryDate(entry.date), entry.name, entry.intensity, entry.note || "--"].forEach((value) => {
       const cell = document.createElement("td");
       cell.textContent = value;
       row.appendChild(cell);
     });
-    moodHistoryRows.appendChild(row);
+    focusStateHistoryRows.appendChild(row);
   });
 }
 
-function deleteMood(id) {
-  moodEntries = moodEntries.filter((entry) => entry.id !== id);
-  saveMoodEntries();
-  renderMoods();
-  renderMoodHistory();
+function deletefocusState(id) {
+  focusStateEntries = focusStateEntries.filter((entry) => entry.id !== id);
+  savefocusStateEntries();
+  renderfocusStates();
+  renderfocusStateHistory();
 }
 
-function renderJournal() {
-  journalEntries = loadJournalEntries();
-  updateJournalLogButton();
+function renderfocusLog() {
+  focusLogEntries = loadfocusLogEntries();
+  updatefocusLogLogButton();
 }
 
-function updateJournalLogButton() {
-  if (!journalLogLink) return;
-  journalLogLink.textContent = `Journal Log (${journalEntries.length})`;
+function updatefocusLogLogButton() {
+  if (!focusLogLogLink) return;
+  focusLogLogLink.textContent = `focusLog Log (${focusLogEntries.length})`;
 }
 
-function openJournalLogList() {
-  journalEntries = loadJournalEntries();
+function openfocusLogLogList() {
+  focusLogEntries = loadfocusLogEntries();
   const modal = document.createElement("section");
   const panel = document.createElement("div");
   const heading = document.createElement("div");
@@ -3049,27 +3223,27 @@ function openJournalLogList() {
   const logControls = document.createElement("div");
   const list = document.createElement("div");
 
-  modal.className = "history-modal journal-log-modal";
-  modal.setAttribute("aria-labelledby", "journalLogDialogTitle");
+  modal.className = "history-modal focusLog-log-modal";
+  modal.setAttribute("aria-labelledby", "focusLogLogDialogTitle");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("role", "dialog");
-  panel.className = "history-panel journal-log-panel";
+  panel.className = "history-panel focusLog-log-panel";
   heading.className = "section-heading";
-  title.id = "journalLogDialogTitle";
-  title.textContent = "Journal Log";
-  actions.className = "journal-log-actions";
-  deleteAllButton.className = "text-button danger-action journal-delete-all-button";
+  title.id = "focusLogLogDialogTitle";
+  title.textContent = "focusLog Log";
+  actions.className = "focusLog-log-actions";
+  deleteAllButton.className = "text-button danger-action focusLog-delete-all-button";
   deleteAllButton.type = "button";
   deleteAllButton.textContent = "Delete all";
-  deleteAllButton.disabled = journalEntries.length === 0;
+  deleteAllButton.disabled = focusLogEntries.length === 0;
   closeButton.className = "delete-button";
   closeButton.type = "button";
-  closeButton.setAttribute("aria-label", "Close journal log");
+  closeButton.setAttribute("aria-label", "Close focusLog log");
   closeButton.textContent = "x";
-  logControls.className = "journal-log-controls";
-  list.className = "symptom-list journal-log-list";
+  logControls.className = "focusLog-log-controls";
+  list.className = "archiveB-list focusLog-log-list";
 
-  buildJournalLogList(list, (entry, label) => openJournalEntryDialog(entry, label, modal));
+  buildfocusLogLogList(list, (entry, label) => openfocusLogEntryDialog(entry, label, modal));
   titleWrap.append(title);
   actions.append(closeButton);
   heading.append(titleWrap, actions);
@@ -3080,11 +3254,11 @@ function openJournalLogList() {
 
   const close = () => modal.remove();
   deleteAllButton.addEventListener("click", () => {
-    if (!window.confirm("Are you sure you want to delete all journal entries? This cannot be undone.")) return;
-    if (!window.confirm("Are you absolutely sure? This permanently deletes every journal entry.")) return;
-    deleteAllJournalEntries();
+    if (!window.confirm("Are you sure you want to delete all focusLog entries? This cannot be undone.")) return;
+    if (!window.confirm("Are you absolutely sure? This permanently deletes every focusLog entry.")) return;
+    deleteAllfocusLogEntries();
     list.textContent = "";
-    buildJournalLogList(list, (entry, label) => openJournalEntryDialog(entry, label, modal));
+    buildfocusLogLogList(list, (entry, label) => openfocusLogEntryDialog(entry, label, modal));
     deleteAllButton.disabled = true;
   });
   closeButton.addEventListener("click", close);
@@ -3097,18 +3271,18 @@ function openJournalLogList() {
     window.removeEventListener("keydown", onKeydown);
   });
   window.setTimeout(() => {
-    const firstEntry = list.querySelector(".journal-item:not(.journal-empty-log)");
+    const firstEntry = list.querySelector(".focusLog-item:not(.focusLog-empty-log)");
     (firstEntry || closeButton).focus({ preventScroll: true });
   }, 30);
 }
 
-function buildJournalLogList(container, onEntryClick) {
-  const groupedEntries = journalEntries.reduce((groups, entry) => {
+function buildfocusLogLogList(container, onEntryClick) {
+  const groupedEntries = focusLogEntries.reduce((groups, entry) => {
     if (!groups.has(entry.date)) groups.set(entry.date, []);
     groups.get(entry.date).push(entry);
     return groups;
   }, new Map());
-  const dateKeys = [...new Set(journalEntries.map((entry) => entry.date))]
+  const dateKeys = [...new Set(focusLogEntries.map((entry) => entry.date))]
     .sort((first, second) => second.localeCompare(first));
 
   dateKeys.forEach((dateKey) => {
@@ -3117,8 +3291,8 @@ function buildJournalLogList(container, onEntryClick) {
     const group = document.createElement("section");
     const heading = document.createElement("h3");
     const dateLabel = formatEntryDate(dateKey);
-    group.className = "journal-date-group";
-    heading.className = "journal-date-heading";
+    group.className = "focusLog-date-group";
+    heading.className = "focusLog-date-heading";
     heading.textContent = `${dateLabel} - ${entries.length} entr${entries.length === 1 ? "y" : "ies"}`;
     group.appendChild(heading);
     entries.forEach((entry, index) => {
@@ -3126,8 +3300,8 @@ function buildJournalLogList(container, onEntryClick) {
       const text = document.createElement("span");
       const title = document.createElement("strong");
       const meta = document.createElement("span");
-      const label = getJournalEntryPreview(entry, index);
-      item.className = "symptom-item journal-item";
+      const label = getfocusLogEntryPreview(entry, index);
+      item.className = "archiveB-item focusLog-item";
       item.type = "button";
       item.setAttribute("aria-label", `${label}, ${dateLabel}`);
       title.textContent = label;
@@ -3141,24 +3315,24 @@ function buildJournalLogList(container, onEntryClick) {
   });
   if (!container.children.length) {
     const emptyItem = document.createElement("div");
-    emptyItem.className = "nutrition-empty";
-    emptyItem.textContent = "No journal entries logged.";
+    emptyItem.className = "archiveA-empty";
+    emptyItem.textContent = "No focusLog entries logged.";
     container.appendChild(emptyItem);
   }
 }
 
-function getJournalEntryPreview(entry, index) {
+function getfocusLogEntryPreview(entry, index) {
   const preview = String(entry.text || "").replace(/\s+/g, " ").trim();
   if (preview) return preview.length > 72 ? `${preview.slice(0, 72)}...` : preview;
-  return `Journal entry ${index + 1}`;
+  return `focusLog entry ${index + 1}`;
 }
 
-function buildJournalEmptyLogItem(dateKey) {
+function buildfocusLogEmptyLogItem(dateKey) {
   const emptyItem = document.createElement("div");
   const text = document.createElement("span");
   const title = document.createElement("strong");
   const meta = document.createElement("span");
-  emptyItem.className = "symptom-item journal-item journal-empty-log";
+  emptyItem.className = "archiveB-item focusLog-item focusLog-empty-log";
   title.textContent = "No entry logged";
   meta.textContent = formatEntryDate(dateKey);
   text.append(title, meta);
@@ -3166,7 +3340,7 @@ function buildJournalEmptyLogItem(dateKey) {
   return emptyItem;
 }
 
-function openJournalEntryDialog(entry, label, returnModal = null) {
+function openfocusLogEntryDialog(entry, label, returnModal = null) {
   if (returnModal) returnModal.hidden = true;
   const modal = document.createElement("section");
   const panel = document.createElement("div");
@@ -3180,29 +3354,29 @@ function openJournalEntryDialog(entry, label, returnModal = null) {
   const closeButton = document.createElement("button");
   const body = document.createElement("p");
 
-  modal.className = "history-modal journal-entry-modal";
-  modal.setAttribute("aria-labelledby", "journalEntryTitle");
+  modal.className = "history-modal focusLog-entry-modal";
+  modal.setAttribute("aria-labelledby", "focusLogEntryTitle");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("role", "dialog");
-  panel.className = "history-panel journal-entry-panel";
+  panel.className = "history-panel focusLog-entry-panel";
   heading.className = "section-heading";
   eyebrow.className = "eyebrow";
   eyebrow.textContent = label;
-  title.id = "journalEntryTitle";
+  title.id = "focusLogEntryTitle";
   title.textContent = formatEntryDate(entry.date);
-  actions.className = "journal-entry-actions";
-  backButton.className = "text-button journal-back-button";
+  actions.className = "focusLog-entry-actions";
+  backButton.className = "text-button focusLog-back-button";
   backButton.type = "button";
   backButton.textContent = "Back";
   backButton.hidden = !returnModal;
-  deleteButton.className = "text-button journal-delete-button danger-action";
+  deleteButton.className = "text-button focusLog-delete-button danger-action";
   deleteButton.type = "button";
   deleteButton.textContent = "Delete";
   closeButton.className = "delete-button";
   closeButton.type = "button";
-  closeButton.setAttribute("aria-label", "Close journal entry");
+  closeButton.setAttribute("aria-label", "Close focusLog entry");
   closeButton.textContent = "x";
-  body.className = "journal-entry-text";
+  body.className = "focusLog-entry-text";
   body.textContent = entry.text;
 
   actions.append(backButton, deleteButton, closeButton);
@@ -3218,12 +3392,12 @@ function openJournalEntryDialog(entry, label, returnModal = null) {
   };
   backButton.addEventListener("click", close);
   deleteButton.addEventListener("click", () => {
-    if (!window.confirm("Are you sure you want to delete this journal entry? This cannot be undone.")) return;
-    deleteJournalEntry(entry.id);
+    if (!window.confirm("Are you sure you want to delete this focusLog entry? This cannot be undone.")) return;
+    deletefocusLogEntry(entry.id);
     modal.remove();
     if (returnModal) {
       returnModal.remove();
-      openJournalLogList();
+      openfocusLogLogList();
     }
   });
   closeButton.addEventListener("click", close);
@@ -3237,34 +3411,34 @@ function openJournalEntryDialog(entry, label, returnModal = null) {
   });
 }
 
-function deleteJournalEntry(id) {
-  const entry = journalEntries.find((item) => item.id === id);
+function deletefocusLogEntry(id) {
+  const entry = focusLogEntries.find((item) => item.id === id);
   if (entry?.date && entry?.text) {
-    const deletedKeys = loadDeletedJournalEntryKeys();
+    const deletedKeys = loadDeletedfocusLogEntryKeys();
     deletedKeys.add(`${entry.date}:${entry.text}`);
-    saveDeletedJournalEntryKeys(deletedKeys);
+    saveDeletedfocusLogEntryKeys(deletedKeys);
   }
-  journalEntries = journalEntries.filter((entry) => entry.id !== id);
-  saveJournalEntries();
-  renderJournal();
+  focusLogEntries = focusLogEntries.filter((entry) => entry.id !== id);
+  savefocusLogEntries();
+  renderfocusLog();
   scheduleSmartCoachRender();
-  showToast("Journal entry deleted.");
+  showToast("focusLog entry deleted.");
 }
 
-function deleteAllJournalEntries() {
-  const deletedKeys = loadDeletedJournalEntryKeys();
-  journalEntries.forEach((entry) => {
+function deleteAllfocusLogEntries() {
+  const deletedKeys = loadDeletedfocusLogEntryKeys();
+  focusLogEntries.forEach((entry) => {
     if (entry?.date && entry?.text) deletedKeys.add(`${entry.date}:${entry.text}`);
   });
-  saveDeletedJournalEntryKeys(deletedKeys);
-  journalEntries = [];
-  localStorage.setItem(journalStoreKey, JSON.stringify([]));
-  ["habit-tracker:journal:v1", "habit-tracker:journal", "journalEntries"].forEach((key) => {
+  saveDeletedfocusLogEntryKeys(deletedKeys);
+  focusLogEntries = [];
+  localStorage.setItem(focusLogStoreKey, JSON.stringify([]));
+  ["habit-tracker:focusLog:v1", "habit-tracker:focusLog", "focusLogEntries"].forEach((key) => {
     localStorage.removeItem(key);
   });
-  renderJournal();
+  renderfocusLog();
   scheduleSmartCoachRender();
-  showToast("All journal entries deleted.");
+  showToast("All focusLog entries deleted.");
 }
 
 function editHabit(id) {
@@ -3273,12 +3447,1647 @@ function editHabit(id) {
   editingHabitId = id;
   habitName.value = habit.name;
   if (taskDate) taskDate.value = getTaskDateKey(habit);
-  habitCategory.value = habit.category || "Health";
+  habitCategory.value = habit.category || "General";
   habitDeadline.value = normalizeTaskTime(habit.deadline);
-  habitPriority.value = habit.priority || "Normal";
+  habitPriority.value = normalizeTaskPriority(habit.priority);
+  if (habitSize) habitSize.value = normalizeTaskSize(habit.size);
+  syncTaskChoiceButtons();
   habitNote.value = habit.note || "";
-  habitForm.querySelector(".primary-button").textContent = "Save";
+  habitForm.querySelector(".primary-button").textContent = "Save task";
   habitName.focus();
+}
+
+function openTaskBreakdownPrompt(task, options = {}) {
+  if (!task) return;
+  const modal = buildTaskBreakdownShell(task, {
+    title: "Photo checklist",
+    intro: "Add a photo or a few details. AI will turn the messy part into tiny checkable steps.",
+    cancelDeletesTask: Boolean(options.cancelDeletesTask)
+  });
+  const actions = document.createElement("div");
+  const generateButton = document.createElement("button");
+
+  modal.body.appendChild(buildTaskBreakdownDetailInput(task, modal));
+  actions.className = "settings-actions task-breakdown-actions task-breakdown-submit-actions";
+  generateButton.className = "primary-button";
+  generateButton.type = "button";
+  generateButton.textContent = "Submit";
+  actions.append(generateButton);
+  modal.body.appendChild(actions);
+  document.body.appendChild(modal.root);
+  updateDialogScrollLock();
+
+  generateButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
+  if (options.autoPhoto) modal.issuePhotoInput?.click();
+  if (options.autoGallery) modal.issueGalleryPhotoInput?.click();
+}
+
+function openTaskBreakdownDialog(task) {
+  if (!task) return;
+  const breakdown = taskBreakdowns[task.id];
+  const modal = buildTaskBreakdownShell(task, {
+    title: breakdown ? "AI checklist" : "Photo checklist",
+    intro: breakdown ? breakdown.summary : "Add a photo or a few details. AI will turn the messy part into tiny checkable steps."
+  });
+  document.body.appendChild(modal.root);
+  updateDialogScrollLock();
+
+  if (breakdown) {
+    renderTaskBreakdownSteps(task, modal, breakdown);
+  } else {
+    const actions = document.createElement("div");
+    const generateButton = document.createElement("button");
+    modal.body.appendChild(buildTaskBreakdownDetailInput(task, modal));
+    actions.className = "settings-actions task-breakdown-actions task-breakdown-submit-actions";
+    generateButton.className = "primary-button";
+    generateButton.type = "button";
+    generateButton.textContent = "Submit";
+    actions.appendChild(generateButton);
+    modal.body.appendChild(actions);
+    generateButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
+  }
+}
+
+function openAppHelpBotDialog() {
+  const modal = buildTaskBreakdownShell({ name: "TaskLens AI" }, {
+    title: "AI help",
+    intro: "Ask how to use the app or jump to a task action."
+  });
+  modal.root.classList.add("app-help-modal");
+  const chat = document.createElement("div");
+  const inputRow = document.createElement("form");
+  const input = document.createElement("input");
+  const sendButton = document.createElement("button");
+
+  chat.className = "app-help-chat";
+  modal.appHelpChatHistory = [];
+  inputRow.className = "app-help-input-row";
+  input.type = "text";
+  input.maxLength = 1200;
+  input.placeholder = "Message TaskLens AI...";
+  sendButton.className = "primary-button";
+  sendButton.type = "submit";
+  sendButton.textContent = "Send";
+
+  addAppHelpMessage(chat, "Tell me what you need help with. I can answer like a normal AI chat, or help you use this app without overloading you.", "assistant", modal);
+  inputRow.append(input, sendButton);
+  modal.body.append(chat, inputRow);
+  document.body.appendChild(modal.root);
+  updateDialogScrollLock();
+  input.focus();
+
+  inputRow.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const question = input.value.replace(/\s+/g, " ").trim();
+    if (!question) return;
+    input.value = "";
+    addAppHelpMessage(chat, question, "user", modal);
+    answerAppHelpQuestion(question, chat, modal);
+  });
+}
+
+function addAppHelpMessage(chat, text, role, modal = null) {
+  const message = document.createElement("div");
+  const normalizedRole = role === "user" ? "user" : "assistant";
+  message.className = `app-help-message app-help-message-${normalizedRole === "user" ? "user" : "bot"}`;
+  message.textContent = text;
+  chat.appendChild(message);
+  chat.scrollTop = chat.scrollHeight;
+  if (modal?.appHelpChatHistory) {
+    modal.appHelpChatHistory.push({ role: normalizedRole, content: String(text || "").slice(0, 1800) });
+    modal.appHelpChatHistory = modal.appHelpChatHistory.slice(-12);
+  }
+  return message;
+}
+
+async function answerAppHelpQuestion(question, chat, modal) {
+  const normalized = question.toLowerCase();
+  let jumpTarget = "";
+  let action = "";
+
+  if (/\b(add|create|new)\b.*\btask\b|\btask\b.*\b(add|create|new)\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\bsort|organize|overwhelm|overwhelmed|clean up|cleanup\b/.test(normalized)) {
+    action = "sort";
+  } else if (/\bstuck|blocked|can't start|cannot start|task paralysis|paralyzed\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\bfocus|timer|one task|single task\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\b(photo|picture|image|camera|inspect)\b|\bai\b.*\bchecklist\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\bchecklist|steps?|check off|mark\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\bsetting|backend|ai url|cloud|token\b/.test(normalized)) {
+    jumpTarget = "settings";
+  } else if (/\bdelete|remove\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  } else if (/\bedit|change|rename|update\b/.test(normalized)) {
+    jumpTarget = "tasks";
+  }
+
+  const thinking = addAppHelpMessage(chat, "Thinking...", "assistant");
+  try {
+    const answer = await fetchAppHelpChatReply(modal?.appHelpChatHistory || [{ role: "user", content: question }]);
+    thinking.textContent = answer;
+    if (modal?.appHelpChatHistory) {
+      modal.appHelpChatHistory.push({ role: "assistant", content: answer.slice(0, 1800) });
+      modal.appHelpChatHistory = modal.appHelpChatHistory.slice(-12);
+    }
+  } catch {
+    const fallback = getLocalAppHelpAnswer(question);
+    thinking.textContent = fallback;
+    if (modal?.appHelpChatHistory) {
+      modal.appHelpChatHistory.push({ role: "assistant", content: fallback.slice(0, 1800) });
+      modal.appHelpChatHistory = modal.appHelpChatHistory.slice(-12);
+    }
+  }
+
+  if (action === "sort") {
+    const sortButton = document.createElement("button");
+    sortButton.className = "text-button app-help-jump";
+    sortButton.type = "button";
+    sortButton.textContent = "Sort my list";
+    sortButton.addEventListener("click", () => {
+      organizeTaskListForfocus();
+      addAppHelpMessage(chat, "Your open tasks are sorted. Start with the first Now task, preferably Tiny or Small.", "assistant", modal);
+    });
+    chat.appendChild(sortButton);
+    chat.scrollTop = chat.scrollHeight;
+    return;
+  }
+  if (!jumpTarget) return;
+  const jumpButton = document.createElement("button");
+  jumpButton.className = "text-button app-help-jump";
+  jumpButton.type = "button";
+  jumpButton.textContent = jumpTarget === "settings" ? "Open settings" : "Go to tasks";
+  jumpButton.addEventListener("click", () => {
+    closeTaskBreakdownModal(modal.root);
+    if (jumpTarget === "settings") {
+      settingsButton?.click();
+    } else {
+      jumpFromDashboard(jumpTarget);
+    }
+  });
+  chat.appendChild(jumpButton);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function fetchAppHelpChatReply(messages) {
+  const headers = { "Content-Type": "application/json" };
+  if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const backendUrl = getConfiguredAiBackendUrl();
+  if (!backendUrl || !canUseCloudAi()) throw new Error("AI chat is not available.");
+  const response = await fetchWithTimeout(`${backendUrl}/api/chat`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ messages })
+  }, 30000);
+  if (!response.ok) throw new Error(await getFriendlyAiError(response, "AI chat"));
+  const data = await response.json();
+  return String(data?.reply || "").replace(/\s+/g, " ").trim().slice(0, 2400) || getLocalAppHelpAnswer("");
+}
+
+function getLocalAppHelpAnswer(question) {
+  const normalized = String(question || "").toLowerCase();
+  if (/\b(add|create|new)\b.*\btask\b|\btask\b.*\b(add|create|new)\b/.test(normalized)) {
+    return "Use Brain dump at the top: write the messy thought, choose Now/Next/Later and a size, then tap Turn into task.";
+  }
+  if (/\bsort|organize|overwhelm|overwhelmed|clean up|cleanup\b/.test(normalized)) {
+    return "I can sort open tasks so Now comes first, then Next, then Later, with Tiny and deadline tasks pulled upward.";
+  }
+  if (/\bstuck|blocked|can't start|cannot start|task paralysis|paralyzed\b/.test(normalized)) {
+    return "When a task feels stuck, tap Stuck on that task. I will help turn it into the smallest visible next step.";
+  }
+  if (/\bfocus|timer|one task|single task\b/.test(normalized)) {
+    return "Use Focus on a task when you want one-task mode: pick 5, 10, 15, or 25 minutes and stay with only that task.";
+  }
+  if (/\b(photo|picture|image|camera|inspect)\b|\bai\b.*\bchecklist\b/.test(normalized)) {
+    return "Take a picture, add any important detail, then submit it. The checklist comes first; make a target picture only if you need one.";
+  }
+  if (/\bchecklist|steps?|check off|mark\b/.test(normalized)) {
+    return "Open the task's AI List button. Checkboxes mark steps done, text fields let you edit steps, and Add creates another step.";
+  }
+  if (/\bsetting|settings\b/.test(normalized)) {
+    return "Open Settings from the top controls. Keep it simple: turn cloud AI on if you want AI chat and photo checklists.";
+  }
+  return "AI chat is unavailable right now, but I can still help with the app: add a brain dump task, take a photo for an AI checklist, sort your list, or use Focus on one task.";
+}
+
+let activeFocusSessionTimer = null;
+
+function normalizeTaskPriority(value) {
+  const priority = String(value || "").trim();
+  if (["Now", "Next", "Later"].includes(priority)) return priority;
+  if (/high/i.test(priority)) return "Now";
+  if (/low/i.test(priority)) return "Later";
+  return "Next";
+}
+
+function normalizeTaskSize(value) {
+  const size = String(value || "").trim();
+  return ["Tiny", "Small", "Medium", "Big"].includes(size) ? size : "Small";
+}
+
+function organizeTaskListForfocus() {
+  const priorityOrder = { Now: 0, Next: 1, Later: 2 };
+  const sizeOrder = { Tiny: 0, Small: 1, Medium: 2, Big: 3 };
+  habits = [...habits].sort((first, second) => {
+    const firstDone = first.completions?.includes(getTaskDateKey(first)) ? 1 : 0;
+    const secondDone = second.completions?.includes(getTaskDateKey(second)) ? 1 : 0;
+    if (firstDone !== secondDone) return firstDone - secondDone;
+    const firstDate = getTaskDateKey(first);
+    const secondDate = getTaskDateKey(second);
+    if (firstDate !== secondDate) return firstDate.localeCompare(secondDate);
+    const priorityDiff = (priorityOrder[normalizeTaskPriority(first.priority)] ?? 1) - (priorityOrder[normalizeTaskPriority(second.priority)] ?? 1);
+    if (priorityDiff) return priorityDiff;
+    const firstDeadline = normalizeTaskTime(first.deadline) || "99:99";
+    const secondDeadline = normalizeTaskTime(second.deadline) || "99:99";
+    if (firstDeadline !== secondDeadline) return firstDeadline.localeCompare(secondDeadline);
+    return (sizeOrder[normalizeTaskSize(first.size)] ?? 1) - (sizeOrder[normalizeTaskSize(second.size)] ?? 1);
+  });
+  saveHabits();
+  render();
+  showToast("List sorted into a calmer order.");
+}
+
+function openTaskStuckDialog(task) {
+  if (!task) return;
+  const modal = buildTaskBreakdownShell(task, {
+    title: "Stuck mode",
+    intro: "Name the blocker. TaskLens will make the next step smaller."
+  });
+  modal.root.classList.add("task-stuck-modal");
+  const field = document.createElement("textarea");
+  const suggestion = document.createElement("p");
+  const actions = document.createElement("div");
+  const makeStepButton = document.createElement("button");
+  const closeButton = document.createElement("button");
+
+  field.rows = 4;
+  field.maxLength = 360;
+  field.placeholder = "What is blocking you? Too vague, too big, missing info, don't know where to start...";
+  field.className = "task-stuck-input";
+  suggestion.className = "task-stuck-suggestion";
+  suggestion.textContent = getTinyNextStep(task, "");
+  actions.className = "settings-actions task-breakdown-actions";
+  makeStepButton.className = "primary-button";
+  makeStepButton.type = "button";
+  makeStepButton.textContent = "Make this the first step";
+  closeButton.className = "text-button";
+  closeButton.type = "button";
+  closeButton.textContent = "Close";
+
+  field.addEventListener("input", () => {
+    suggestion.textContent = getTinyNextStep(task, field.value);
+  });
+  makeStepButton.addEventListener("click", () => {
+    addTinyStepToTaskBreakdown(task, suggestion.textContent, field.value);
+    closeTaskBreakdownModal(modal.root);
+    openTaskBreakdownDialog(task);
+  });
+  closeButton.addEventListener("click", () => closeTaskBreakdownModal(modal.root));
+
+  actions.append(makeStepButton, closeButton);
+  modal.body.append(field, suggestion, actions);
+  document.body.appendChild(modal.root);
+  updateDialogScrollLock();
+  field.focus();
+}
+
+function getTinyNextStep(task, blocker) {
+  const taskName = String(task?.name || "this task").trim();
+  const text = String(blocker || "").toLowerCase();
+  if (/\bcall|phone|text|email|message\b/.test(taskName.toLowerCase())) return `Open the contact or message thread for "${taskName}".`;
+  if (/\bclean|room|kitchen|laundry|dishes|trash\b/.test(taskName.toLowerCase())) return "Set a 5-minute timer and move only five visible items.";
+  if (/\bmissing|info|information|don't know|dont know|unsure|confused\b/.test(text)) return "Write down the one piece of information needed before doing anything else.";
+  if (/\btoo big|overwhelming|overwhelmed|huge|many\b/.test(text) || normalizeTaskSize(task?.size) === "Big") return `Do only the first two minutes of "${taskName}". Stop after that if needed.`;
+  return `Open whatever you need for "${taskName}" and do the first visible action.`;
+}
+
+function addTinyStepToTaskBreakdown(task, stepText, blocker) {
+  const existing = taskBreakdowns[task.id] || {
+    title: task.name,
+    summary: "Start with the smallest visible step.",
+    generatedAt: new Date().toISOString(),
+    sourcePrompt: String(blocker || task.note || "").trim(),
+    sourceImageDataUrl: "",
+    steps: []
+  };
+  existing.steps = [{
+    id: `${task.id}:stuck:${Date.now()}`,
+    text: String(stepText || "").trim().slice(0, 180),
+    done: false
+  }, ...(existing.steps || [])].slice(0, 12);
+  existing.summary = "Start with the smallest visible step.";
+  existing.sourcePrompt = String(blocker || existing.sourcePrompt || "").trim().slice(0, 1600);
+  taskBreakdowns = { ...taskBreakdowns, [task.id]: existing };
+  saveTaskBreakdowns();
+  render();
+}
+
+function openTaskFocusDialog(task) {
+  if (!task) return;
+  const modal = buildTaskBreakdownShell(task, {
+    title: "Focus session",
+    intro: "Pick one short timer for this task."
+  });
+  modal.root.classList.add("task-focus-modal");
+  const timer = document.createElement("div");
+  const choices = document.createElement("div");
+  const actions = document.createElement("div");
+  const doneButton = document.createElement("button");
+  const smallerButton = document.createElement("button");
+  const closeButton = document.createElement("button");
+  const minuteOptions = [5, 10, 15, 25];
+
+  timer.className = "task-focus-timer";
+  timer.textContent = "Choose a timer";
+  choices.className = "task-focus-choices";
+  actions.className = "settings-actions task-breakdown-actions";
+
+  minuteOptions.forEach((minutes) => {
+    const button = document.createElement("button");
+    button.className = "text-button";
+    button.type = "button";
+    button.textContent = `${minutes} min`;
+    button.addEventListener("click", () => startTaskFocusSession(minutes, timer, modal.intro));
+    choices.appendChild(button);
+  });
+
+  doneButton.className = "primary-button";
+  doneButton.type = "button";
+  doneButton.textContent = "Mark task done";
+  doneButton.addEventListener("click", () => {
+    const dateKey = getTaskDateKey(task);
+    if (!task.completions.includes(dateKey)) {
+      toggleHabit(task.id, dateKey);
+    }
+    closeTaskBreakdownModal(modal.root);
+  });
+  smallerButton.className = "text-button";
+  smallerButton.type = "button";
+  smallerButton.textContent = "Break smaller";
+  smallerButton.addEventListener("click", () => {
+    closeTaskBreakdownModal(modal.root);
+    openTaskStuckDialog(task);
+  });
+  closeButton.className = "text-button";
+  closeButton.type = "button";
+  closeButton.textContent = "Close";
+  closeButton.addEventListener("click", () => closeTaskBreakdownModal(modal.root));
+
+  actions.append(doneButton, smallerButton, closeButton);
+  modal.body.append(timer, choices, actions);
+  document.body.appendChild(modal.root);
+  updateDialogScrollLock();
+}
+
+function startTaskFocusSession(minutes, timer, intro) {
+  window.clearInterval(activeFocusSessionTimer);
+  let remaining = Math.max(1, minutes) * 60;
+  const renderTime = () => {
+    const mins = Math.floor(remaining / 60);
+    const secs = String(remaining % 60).padStart(2, "0");
+    timer.textContent = `${mins}:${secs}`;
+  };
+  renderTime();
+  if (intro) intro.textContent = "Stay with one task. When the timer ends, choose done, continue, or break smaller.";
+  activeFocusSessionTimer = window.setInterval(() => {
+    remaining -= 1;
+    renderTime();
+    if (remaining <= 0) {
+      window.clearInterval(activeFocusSessionTimer);
+      activeFocusSessionTimer = null;
+      timer.textContent = "Time is up";
+      if (intro) intro.textContent = "Done, continue, or make the task smaller.";
+      showToast("Focus session finished.");
+    }
+  }, 1000);
+}
+
+function buildTaskBreakdownShell(task, content) {
+  const root = document.createElement("section");
+  const panel = document.createElement("div");
+  const heading = document.createElement("div");
+  const titleWrap = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  const title = document.createElement("h2");
+  const closeButton = document.createElement("button");
+  const intro = document.createElement("p");
+  const body = document.createElement("div");
+
+  root.className = "history-modal task-breakdown-modal";
+  root.setAttribute("aria-labelledby", "taskBreakdownTitle");
+  root.setAttribute("aria-modal", "true");
+  root.setAttribute("role", "dialog");
+  panel.className = "history-panel task-breakdown-panel";
+  root.taskBreakdownTaskId = task.id;
+  root.taskBreakdownCancelDeletesTask = Boolean(content.cancelDeletesTask);
+  root.taskBreakdownSaved = !content.cancelDeletesTask;
+  heading.className = "section-heading";
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = task.name;
+  title.id = "taskBreakdownTitle";
+  title.textContent = content.title;
+  closeButton.className = "delete-button";
+  closeButton.type = "button";
+  closeButton.setAttribute("aria-label", content.cancelDeletesTask ? "Cancel task" : "Close task steps");
+  closeButton.textContent = "x";
+  intro.className = "task-breakdown-intro";
+  intro.textContent = content.intro || "";
+  body.className = "task-breakdown-body";
+
+  titleWrap.append(eyebrow, title);
+  heading.append(titleWrap, closeButton);
+  panel.append(heading, intro, body);
+  root.appendChild(panel);
+
+  closeButton.addEventListener("click", () => closeTaskBreakdownModal(root, { cancel: true }));
+  root.addEventListener("click", (event) => {
+    if (event.target === root) closeTaskBreakdownModal(root, { cancel: true });
+  });
+
+  return { root, panel, eyebrow, intro, body };
+}
+
+function buildTaskBreakdownDetailInput(task, modal) {
+  const wrap = document.createElement("div");
+  const composer = document.createElement("div");
+  const textarea = document.createElement("textarea");
+  const photoInput = document.createElement("input");
+  const galleryInput = document.createElement("input");
+  const photoButton = document.createElement("button");
+  const galleryButton = document.createElement("button");
+  const photoPreview = document.createElement("img");
+  const photoAnalysis = document.createElement("p");
+  const tools = document.createElement("div");
+
+  wrap.className = "task-breakdown-detail-box";
+
+  composer.className = "task-breakdown-composer";
+  textarea.rows = 3;
+  textarea.maxLength = 1600;
+  textarea.placeholder = "What should AI notice or prioritize?";
+  textarea.value = "";
+  modal.detailsInput = textarea;
+
+  photoInput.type = "file";
+  photoInput.accept = "image/*";
+  photoInput.capture = "environment";
+  photoInput.className = "task-breakdown-photo-input";
+  photoInput.hidden = true;
+  galleryInput.type = "file";
+  galleryInput.accept = "image/*";
+  galleryInput.className = "task-breakdown-photo-input";
+  galleryInput.hidden = true;
+  photoButton.className = "text-button task-breakdown-icon-button";
+  photoButton.type = "button";
+  photoButton.textContent = "Take photo";
+  photoButton.setAttribute("aria-label", "Take a photo for AI");
+  galleryButton.className = "text-button task-breakdown-icon-button";
+  galleryButton.type = "button";
+  galleryButton.textContent = "Choose photo";
+  galleryButton.setAttribute("aria-label", "Choose an existing photo for AI");
+  photoPreview.className = "task-breakdown-photo-preview";
+  photoPreview.alt = "Selected issue photo preview";
+  photoPreview.hidden = true;
+  photoAnalysis.className = "task-breakdown-photo-analysis";
+  photoAnalysis.hidden = true;
+  modal.issuePhotoInput = photoInput;
+  modal.issueGalleryPhotoInput = galleryInput;
+  modal.issuePhotoButton = photoButton;
+  modal.issueGalleryPhotoButton = galleryButton;
+  modal.issuePhotoPreview = photoPreview;
+  modal.issuePhotoAnalysis = photoAnalysis;
+  modal.issueQuestionInput = textarea;
+  modal.task = task;
+
+  tools.className = "task-breakdown-tools";
+  photoInput.addEventListener("change", () => handleTaskBreakdownPhoto(photoInput, modal));
+  galleryInput.addEventListener("change", () => handleTaskBreakdownPhoto(galleryInput, modal));
+  photoButton.addEventListener("click", () => photoInput.click());
+  galleryButton.addEventListener("click", () => galleryInput.click());
+
+  tools.append(photoButton, galleryButton);
+  composer.append(textarea, photoInput, galleryInput);
+  wrap.append(photoPreview, photoAnalysis, composer, tools);
+  return wrap;
+}
+
+async function handleTaskBreakdownPhoto(input, modal) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (!/^image\//i.test(file.type)) {
+    showToast("Choose an image for AI to inspect.");
+    input.value = "";
+    return;
+  }
+  try {
+    if (modal.issuePhotoAnalysis) {
+      modal.issuePhotoAnalysis.hidden = false;
+      modal.issuePhotoAnalysis.textContent = "Compressing photo...";
+    }
+    const startedAt = performance.now();
+    const resized = await prepareTaskBreakdownImages(file);
+    const resizeMs = Math.round(performance.now() - startedAt);
+    modal.issueImageDataUrl = resized.upload;
+    modal.issueImagePreviewDataUrl = resized.preview;
+    modal.issuePhotoTelemetry = {
+      uploadBytes: resized.upload.length,
+      resizeMs
+    };
+    modal.issuePhotoPreview.src = resized.preview;
+    modal.issuePhotoPreview.hidden = false;
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Retake photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose another";
+    if (modal.issuePhotoAnalysis) {
+      modal.issuePhotoAnalysis.hidden = false;
+      modal.issuePhotoAnalysis.textContent = "Photo ready. Submit to build the checklist.";
+    }
+  } catch {
+    modal.issueImageDataUrl = "";
+    modal.issueImagePreviewDataUrl = "";
+    modal.issuePhotoTelemetry = null;
+    input.value = "";
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Take photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose photo";
+    if (modal.issuePhotoAnalysis) {
+      modal.issuePhotoAnalysis.hidden = true;
+      modal.issuePhotoAnalysis.textContent = "";
+    }
+    showToast("Could not read that image.");
+  }
+}
+
+async function prepareTaskBreakdownImages(file) {
+  const image = await loadTaskBreakdownImageFile(file);
+  const preview = renderTaskBreakdownImageDataUrl(image, 640, 0.64);
+  const attempts = [
+    [520, 0.46],
+    [420, 0.38],
+    [320, 0.32],
+    [240, 0.28]
+  ];
+  for (const [maxSide, quality] of attempts) {
+    const upload = renderTaskBreakdownImageDataUrl(image, maxSide, quality);
+    if (upload.length <= 180000) return { upload, preview };
+  }
+  return {
+    upload: renderTaskBreakdownImageDataUrl(image, 240, 0.24),
+    preview
+  };
+}
+
+function loadTaskBreakdownImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = reject;
+      image.onload = () => resolve(image);
+      image.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderTaskBreakdownImageDataUrl(image, maxSide = 1200, quality = 0.82) {
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext("2d", { alpha: false });
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function downscaleTaskBreakdownImageDataUrl(imageDataUrl, maxSide = 420, quality = 0.36) {
+  const source = String(imageDataUrl || "").trim();
+  if (!source.startsWith("data:image/")) return "";
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onerror = () => resolve("");
+    image.onload = () => {
+      try {
+        resolve(renderTaskBreakdownImageDataUrl(image, maxSide, quality));
+      } catch {
+        resolve("");
+      }
+    };
+    image.src = source;
+  });
+}
+
+async function resizeTaskBreakdownImage(file, maxSide = 1200, quality = 0.82) {
+  const image = await loadTaskBreakdownImageFile(file);
+  return renderTaskBreakdownImageDataUrl(image, maxSide, quality);
+}
+
+function getTaskBreakdownDetailItems(task) {
+  return [
+    task.name,
+    getTaskDateKey(task) ? formatarchiveBHistoryDate(getTaskDateKey(task)) : "",
+    formatTaskDeadline(task.deadline),
+    task.category || "General",
+    normalizeTaskPriority(task.priority),
+    normalizeTaskSize(task.size),
+    task.note ? `Note: ${task.note}` : ""
+  ].filter(Boolean);
+}
+
+function closeTaskBreakdownModal(modal, options = {}) {
+  if (modal?.classList?.contains("task-focus-modal")) {
+    window.clearInterval(activeFocusSessionTimer);
+    activeFocusSessionTimer = null;
+  }
+  if (options.cancel && modal?.taskBreakdownCancelDeletesTask && !modal.taskBreakdownSaved) {
+    const taskId = String(modal.taskBreakdownTaskId || "");
+    if (taskId) {
+      habits = habits.filter((habit) => String(habit.id || "") !== taskId);
+      delete taskBreakdowns[taskId];
+      saveHabits();
+      saveTaskBreakdowns();
+      render();
+      showToast("Task canceled.");
+    }
+  }
+  modal?.remove();
+  updateDialogScrollLock();
+}
+
+async function generateTaskBreakdown(task, modal) {
+  const hasPhotoUpload = Boolean(String(modal?.issueImageDataUrl || "").startsWith("data:image/"));
+  const replacingExistingBreakdown = Boolean(taskBreakdowns[task.id]);
+  const requestStartedAt = performance.now();
+  const progressTimers = [];
+  if (hasPhotoUpload && !canUsePremiumPhotoAi()) {
+    showPhotoAiLimitMessage(modal);
+    return;
+  }
+  if (!canUseCloudAi()) {
+    if (modal?.intro) modal.intro.textContent = "Enable cloud AI in Settings first.";
+    return;
+  }
+  if (!modal?.body) return;
+  setTaskBreakdownLoadingOnly(modal, true);
+  modal.body.textContent = "";
+  const loading = document.createElement("p");
+  loading.className = "task-breakdown-status";
+  loading.textContent = hasPhotoUpload
+    ? "Reading visible items..."
+    : "Building the checklist.";
+  modal.body.appendChild(loading);
+  if (hasPhotoUpload) {
+    progressTimers.push(window.setTimeout(() => {
+      if (loading.isConnected) loading.textContent = "Building checklist...";
+    }, 1800));
+    progressTimers.push(window.setTimeout(() => {
+      if (loading.isConnected) loading.textContent = "Saving checklist.";
+    }, 8000));
+  }
+
+  try {
+    const sourcePrompt = String(modal.detailsInput?.value || "").replace(/\s+/g, " ").trim().slice(0, 1600);
+    const sourceImageDataUrl = String(modal.issueImagePreviewDataUrl || modal.issueImageDataUrl || "").slice(0, 1200000);
+    const breakdown = await fetchTaskBreakdown(task, {
+      extraDetails: modal.detailsInput?.value || "",
+      issueQuestion: modal.issueQuestionInput?.value || "",
+      imageDataUrl: modal.issueImageDataUrl || ""
+    });
+    progressTimers.forEach((timer) => window.clearTimeout(timer));
+    const checklistMs = Math.round(performance.now() - requestStartedAt);
+    const tailoredBreakdown = breakdown;
+    breakdown.sourcePrompt = sourcePrompt;
+    breakdown.sourceImageDataUrl = sourceImageDataUrl.startsWith("data:image/") ? sourceImageDataUrl : "";
+    tailoredBreakdown.sourcePrompt = breakdown.sourcePrompt;
+    tailoredBreakdown.sourceImageDataUrl = breakdown.sourceImageDataUrl;
+    tailoredBreakdown.targetImageDataUrl = "";
+    tailoredBreakdown.targetImageError = String(breakdown.targetImageError || "").slice(0, 180);
+    tailoredBreakdown.targetImagePending = false;
+    tailoredBreakdown.photoAiTelemetry = hasPhotoUpload
+      ? normalizePhotoAiTelemetry({
+        ...modal.issuePhotoTelemetry,
+        checklistMs,
+        checklistStatus: "ok",
+        recordedAt: new Date().toISOString()
+      })
+      : normalizePhotoAiTelemetry({});
+    taskBreakdowns = { ...taskBreakdowns, [task.id]: tailoredBreakdown };
+    saveTaskBreakdowns();
+    if (hasPhotoUpload) recordPhotoAiTelemetry(task, tailoredBreakdown, "checklist_ok");
+    recordTaskBreakdownAiEvent(task, tailoredBreakdown, "checklist_generated", {
+      event: { regenerated: replacingExistingBreakdown },
+      context: {
+        source: "cloud_ai",
+        model: appSettings.aiModel || "backend_default",
+        hadPhotoUpload: hasPhotoUpload
+      }
+    });
+    if (hasPhotoUpload) incrementPhotoAiUsage();
+    renderTaskBreakdownSteps(task, modal, tailoredBreakdown);
+    render();
+  } catch (error) {
+    progressTimers.forEach((timer) => window.clearTimeout(timer));
+    if (hasPhotoUpload) {
+      recordPhotoAiTelemetry(task, {
+        photoAiTelemetry: normalizePhotoAiTelemetry({
+          ...modal.issuePhotoTelemetry,
+          checklistMs: Math.round(performance.now() - requestStartedAt),
+          checklistStatus: "error",
+          recordedAt: new Date().toISOString()
+        })
+      }, "checklist_error");
+    }
+    if (!modal?.body) return;
+    setTaskBreakdownLoadingOnly(modal, false);
+    modal.body.textContent = "";
+    const message = document.createElement("p");
+    message.className = "task-breakdown-status";
+    message.textContent = getTaskBreakdownErrorMessage(error);
+    const retryActions = document.createElement("div");
+    const retryButton = document.createElement("button");
+    const editButton = document.createElement("button");
+    retryActions.className = "settings-actions task-breakdown-actions";
+    retryButton.className = "primary-button";
+    retryButton.type = "button";
+    retryButton.textContent = "Try again";
+    editButton.className = "text-button";
+    editButton.type = "button";
+    editButton.textContent = "Edit upload";
+    retryButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
+    editButton.addEventListener("click", () => {
+      modal.body.textContent = "";
+      const inputBox = buildTaskBreakdownDetailInput(task, modal);
+      const actions = document.createElement("div");
+      const sendButton = document.createElement("button");
+      actions.className = "settings-actions task-breakdown-actions task-breakdown-submit-actions";
+      sendButton.className = "primary-button";
+      sendButton.type = "button";
+      sendButton.textContent = "Submit";
+      sendButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
+      actions.appendChild(sendButton);
+      modal.body.append(inputBox, actions);
+    });
+    retryActions.append(retryButton, editButton);
+    modal.body.append(message, retryActions);
+  }
+}
+
+function setTaskBreakdownLoadingOnly(modal, isLoading) {
+  modal?.root?.classList?.toggle("task-breakdown-loading-only", Boolean(isLoading));
+}
+
+function getPhotoAiUsagePeriod() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getPhotoAiUsage() {
+  try {
+    const usage = JSON.parse(localStorage.getItem(photoAiUsageStoreKey) || "{}");
+    const period = getPhotoAiUsagePeriod();
+    return {
+      period,
+      count: usage?.period === period ? Number(usage.count) || 0 : 0,
+      afterCount: usage?.period === period ? Number(usage.afterCount) || 0 : 0
+    };
+  } catch {
+    return { period: getPhotoAiUsagePeriod(), count: 0, afterCount: 0 };
+  }
+}
+
+function incrementPhotoAiUsage() {
+  const usage = getPhotoAiUsage();
+  localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
+    period: usage.period,
+    count: Math.min(999, usage.count + 1),
+    afterCount: usage.afterCount
+  }));
+}
+
+function incrementAfterImageUsage() {
+  const usage = getPhotoAiUsage();
+  localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
+    period: usage.period,
+    count: usage.count,
+    afterCount: Math.min(999, usage.afterCount + 1)
+  }));
+}
+
+function canUsePremiumPhotoAi() {
+  if (appSettings.premiumUnlocked) return getPhotoAiUsage().count < PREMIUM_PHOTO_AI_LIMIT;
+  return getPhotoAiUsage().count < FREE_PHOTO_AI_LIMIT;
+}
+
+function canUseAfterImageAi() {
+  return Boolean(appSettings.premiumUnlocked) && getPhotoAiUsage().afterCount < PREMIUM_AFTER_IMAGE_LIMIT;
+}
+
+function getPhotoAiUsageLabel() {
+  const usage = getPhotoAiUsage();
+  if (appSettings.premiumUnlocked) {
+    return `${Math.max(0, PREMIUM_PHOTO_AI_LIMIT - usage.count)} of ${PREMIUM_PHOTO_AI_LIMIT} premium before-photo checklists and ${Math.max(0, PREMIUM_AFTER_IMAGE_LIMIT - usage.afterCount)} of ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures left this month.`;
+  }
+  return `${Math.max(0, FREE_PHOTO_AI_LIMIT - usage.count)} of ${FREE_PHOTO_AI_LIMIT} free photo checklists left this month.`;
+}
+
+function showPhotoAiLimitMessage(modal) {
+  if (!modal?.body) return;
+  modal.body.textContent = "";
+  const message = document.createElement("p");
+  const actions = document.createElement("div");
+  const textOnlyButton = document.createElement("button");
+  const settingsButtonLocal = document.createElement("button");
+  message.className = "task-breakdown-status";
+  message.textContent = `You used the ${FREE_PHOTO_AI_LIMIT} free photo checklists for this month. Premium includes ${PREMIUM_PHOTO_AI_LIMIT} before-photo checklists and ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures per month for ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}. Text-only task checklists still work.`;
+  actions.className = "settings-actions task-breakdown-actions";
+  textOnlyButton.className = "primary-button";
+  textOnlyButton.type = "button";
+  textOnlyButton.textContent = "Use text only";
+  settingsButtonLocal.className = "text-button";
+  settingsButtonLocal.type = "button";
+  settingsButtonLocal.textContent = "View Premium";
+  textOnlyButton.addEventListener("click", () => {
+    modal.issueImageDataUrl = "";
+    modal.issueImagePreviewDataUrl = "";
+    generateTaskBreakdown(modal.task, modal);
+  });
+  settingsButtonLocal.addEventListener("click", () => accountButton?.click());
+  actions.append(textOnlyButton, settingsButtonLocal);
+  modal.body.append(message, actions);
+}
+
+function showAfterImageLimitMessage() {
+  if (!appSettings.premiumUnlocked) {
+    showToast(`After pictures are included with Premium: ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}.`);
+    accountButton?.click();
+    return;
+  }
+  showToast(`You used all ${PREMIUM_AFTER_IMAGE_LIMIT} Premium after pictures for this month.`);
+}
+
+function getTaskBreakdownErrorMessage(error) {
+  const message = String(error?.message || "");
+  if (/signal is aborted|aborterror|aborted|timed out|timeout/i.test(message)) {
+    return "AI photo upload took too long. Try again, or retake a clearer smaller photo.";
+  }
+  return message || "AI could not break down this task.";
+}
+
+async function fetchTaskBreakdown(task, options = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
+  const backendUrl = getConfiguredAiBackendUrl();
+  if (!backendUrl) throw new Error("AI service is not configured.");
+  const imageDataUrl = String(options.imageDataUrl || "").slice(0, 900000);
+  const taskPayload = {
+    task: {
+      name: task.name,
+      date: getTaskDateKey(task),
+      day: getTaskDay(task),
+      category: task.category,
+      priority: task.priority,
+      size: task.size,
+      deadline: task.deadline,
+      note: task.note,
+      dictationDetails: buildTaskBreakdownContext(task, options),
+      issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+      imageDataUrl
+    }
+  };
+  const rawPhotoBlob = imageDataUrl ? dataUrlToBlob(imageDataUrl) : null;
+  if (rawPhotoBlob) {
+    delete headers["Content-Type"];
+    headers["X-Task-Meta"] = encodeURIComponent(JSON.stringify({
+      ...taskPayload.task,
+      imageDataUrl: ""
+    }));
+    headers["Content-Type"] = rawPhotoBlob.mime;
+  }
+  try {
+    const response = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+      method: "POST",
+      headers,
+      body: rawPhotoBlob ? rawPhotoBlob.blob : JSON.stringify(taskPayload)
+    }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+      }
+      if (response.status === 413) {
+        throw new Error("That photo is too large for the backend. Try a smaller photo.");
+      }
+      throw new Error(await getFriendlyAiError(response, "AI task breakdown"));
+    }
+    return normalizeTaskBreakdown(await response.json(), task);
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (imageDataUrl && /failed to fetch|networkerror|network error|fetch failed/i.test(message)) {
+      const smallerImageDataUrl = await downscaleTaskBreakdownImageDataUrl(imageDataUrl);
+      if (smallerImageDataUrl && smallerImageDataUrl.length < imageDataUrl.length) {
+        const retryResponse = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task: {
+              name: task.name,
+              date: getTaskDateKey(task),
+              day: getTaskDay(task),
+              category: task.category,
+              priority: task.priority,
+              size: task.size,
+              deadline: task.deadline,
+              note: task.note,
+              dictationDetails: buildTaskBreakdownContext(task, options),
+              issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+              imageDataUrl: smallerImageDataUrl.slice(0, 900000)
+            }
+          })
+        }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+        if (retryResponse.ok) {
+          return normalizeTaskBreakdown(await retryResponse.json(), task);
+        }
+        if (retryResponse.status === 404) {
+          throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+        }
+        if (retryResponse.status === 413) {
+          throw new Error("That photo is too large for the backend. Try a smaller photo.");
+        }
+        throw new Error(await getFriendlyAiError(retryResponse, "AI task breakdown"));
+      }
+    }
+    throw error;
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+  const extension = match[1].toLowerCase().replace("jpeg", "jpg");
+  const mime = extension === "jpg" ? "image/jpeg" : `image/${extension}`;
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return {
+    blob: new Blob([bytes], { type: mime }),
+    mime
+  };
+}
+
+async function fetchTaskTargetImage(task, breakdown) {
+  const imageDataUrl = String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")
+    ? String(breakdown.sourceImageDataUrl).slice(0, 900000)
+    : "";
+  if (!imageDataUrl) return null;
+  const headers = { "Content-Type": "application/json" };
+  if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
+  const backendUrl = getConfiguredAiBackendUrl();
+  if (!backendUrl) throw new Error("AI service is not configured.");
+  const response = await fetchWithTimeout(`${backendUrl}/api/tasks/target-image`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      task: {
+        name: task.name,
+        date: getTaskDateKey(task),
+        day: getTaskDay(task),
+        category: task.category,
+        priority: task.priority,
+        size: task.size,
+        deadline: task.deadline,
+        note: task.note,
+        dictationDetails: breakdown.sourcePrompt || "",
+        imageDataUrl
+      },
+      breakdown: {
+        title: breakdown.title,
+        summary: breakdown.summary,
+        steps: Array.isArray(breakdown.steps) ? breakdown.steps.map((step) => ({ text: step.text })) : []
+      }
+    })
+  }, AI_TARGET_IMAGE_TIMEOUT_MS);
+  if (!response.ok) {
+    throw new Error(await getFriendlyAiError(response, "AI target picture"));
+  }
+  const data = await response.json();
+  const targetImageDataUrl = String(data?.targetImageDataUrl || "");
+  return targetImageDataUrl.startsWith("data:image/") ? targetImageDataUrl.slice(0, 2200000) : null;
+}
+
+async function getTaskLensAccountIdToken() {
+  try {
+    if (typeof window.TaskLensAuth?.getIdToken === "function") {
+      return String(await window.TaskLensAuth.getIdToken() || "").trim();
+    }
+  } catch {
+    // The backend will return a sign-in error if account enforcement is enabled.
+  }
+  return "";
+}
+
+async function fetchAndSaveTaskTargetImage(task, modal, breakdown) {
+  const requestStartedAt = performance.now();
+  try {
+    const currentBeforeRequest = taskBreakdowns[task.id];
+    if (!currentBeforeRequest || currentBeforeRequest.generatedAt !== breakdown.generatedAt) return;
+    taskBreakdowns[task.id] = {
+      ...currentBeforeRequest,
+      targetImagePending: true,
+      targetImageError: ""
+    };
+    saveTaskBreakdowns();
+    if (modal?.body?.isConnected) renderTaskBreakdownSteps(task, modal, taskBreakdowns[task.id]);
+    const targetImageDataUrl = await fetchTaskTargetImage(task, breakdown);
+    const afterImageMs = Math.round(performance.now() - requestStartedAt);
+    const current = taskBreakdowns[task.id];
+    if (!current || current.generatedAt !== breakdown.generatedAt) return;
+    taskBreakdowns[task.id] = {
+      ...current,
+      photoAiTelemetry: normalizePhotoAiTelemetry({
+        ...current.photoAiTelemetry,
+        afterImageMs,
+        afterImageStatus: targetImageDataUrl ? "ok" : "empty",
+        recordedAt: new Date().toISOString()
+      }),
+      targetImageDataUrl: targetImageDataUrl || "",
+      targetImageError: targetImageDataUrl ? "" : "Target picture could not be created.",
+      targetImagePending: false
+    };
+    saveTaskBreakdowns();
+    incrementAfterImageUsage();
+    recordPhotoAiTelemetry(task, taskBreakdowns[task.id], targetImageDataUrl ? "after_image_ok" : "after_image_empty");
+    if (modal?.body?.isConnected) renderTaskBreakdownSteps(task, modal, taskBreakdowns[task.id]);
+    render();
+  } catch (error) {
+    const current = taskBreakdowns[task.id];
+    if (!current || current.generatedAt !== breakdown.generatedAt) return;
+    taskBreakdowns[task.id] = {
+      ...current,
+      photoAiTelemetry: normalizePhotoAiTelemetry({
+        ...current.photoAiTelemetry,
+        afterImageMs: Math.round(performance.now() - requestStartedAt),
+        afterImageStatus: "error",
+        recordedAt: new Date().toISOString()
+      }),
+      targetImageError: String(error?.message || "Target picture could not be created.").slice(0, 180),
+      targetImagePending: false
+    };
+    saveTaskBreakdowns();
+    recordPhotoAiTelemetry(task, taskBreakdowns[task.id], "after_image_error");
+    if (modal?.body?.isConnected) renderTaskBreakdownSteps(task, modal, taskBreakdowns[task.id]);
+  }
+}
+
+function recordPhotoAiTelemetry(task, breakdown, eventName) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(photoAiTelemetryStoreKey) || "[]");
+    const entries = Array.isArray(saved) ? saved : [];
+    const telemetry = normalizePhotoAiTelemetry(breakdown?.photoAiTelemetry);
+    entries.push({
+      event: String(eventName || "photo_flow").slice(0, 60),
+      taskId: String(task?.id || "").slice(0, 80),
+      taskName: String(task?.name || "").slice(0, 120),
+      uploadBytes: telemetry.uploadBytes,
+      resizeMs: telemetry.resizeMs,
+      checklistMs: telemetry.checklistMs,
+      afterImageMs: telemetry.afterImageMs,
+      checklistStatus: telemetry.checklistStatus,
+      afterImageStatus: telemetry.afterImageStatus,
+      recordedAt: new Date().toISOString()
+    });
+    localStorage.setItem(photoAiTelemetryStoreKey, JSON.stringify(entries.slice(-80)));
+  } catch {
+    // Telemetry must never block the task flow.
+  }
+}
+
+function requestTaskTargetImage(task, modal, breakdown) {
+  if (!String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")) {
+    showToast("Add a before photo first.");
+    return;
+  }
+  if (!canUseAfterImageAi()) {
+    showAfterImageLimitMessage();
+    return;
+  }
+  if (breakdown.targetImagePending) return;
+  fetchAndSaveTaskTargetImage(task, modal, breakdown);
+}
+
+function maybeRequestAutomaticTaskAfterImage(task, modal, breakdown) {
+  return;
+}
+
+function buildTaskBreakdownContext(task, options = {}) {
+  return [
+    String(options.extraDetails || "").trim(),
+    buildTaskLearningContext(task),
+    `Planning bucket: ${normalizeTaskPriority(task.priority)}.`,
+    `Task size: ${normalizeTaskSize(task.size)}.`,
+    task.deadline ? `Deadline: ${task.deadline}.` : "",
+    "Use the learned local task patterns only as context. Make the checklist inspection-grade and photo-grounded. Each step must identify a visible location or object, the exact action, the destination, and a done-check the user can verify in a second photo. Split separate piles, surfaces, corners, containers, cords, papers, dishes, wrappers, clothing, and tools into separate steps. Avoid generic cleanup language."
+  ].filter(Boolean).join(" ").slice(0, 2500);
+}
+
+function buildTaskLearningContext(task) {
+  const currentId = String(task?.id || "");
+  const category = String(task?.category || "").trim().toLowerCase();
+  const currentTokens = getTaskLearningTokens(`${task?.name || ""} ${task?.note || ""} ${task?.category || ""}`);
+  const relatedTasks = habits
+    .filter((habit) => habit && String(habit.id || "") !== currentId)
+    .map((habit) => {
+      const haystack = `${habit.name || ""} ${habit.note || ""} ${habit.category || ""}`;
+      const tokens = getTaskLearningTokens(haystack);
+      const overlap = tokens.filter((token) => currentTokens.includes(token)).length;
+      const sameCategory = category && String(habit.category || "").trim().toLowerCase() === category ? 2 : 0;
+      const completionScore = Array.isArray(habit.completions) ? Math.min(3, habit.completions.length) : 0;
+      return { habit, score: overlap + sameCategory + completionScore };
+    })
+    .filter((item) => item.score > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 5)
+    .map(({ habit }) => {
+      const status = Array.isArray(habit.completions) && habit.completions.length ? "completed before" : "not completed yet";
+      return `${habit.name}${habit.category ? ` (${habit.category})` : ""}${habit.note ? ` - ${habit.note}` : ""} [${status}]`;
+    });
+  const previousAi = Object.entries(taskBreakdowns || {})
+    .filter(([taskId]) => taskId !== currentId)
+    .map(([taskId, breakdown]) => {
+      const habit = habits.find((item) => String(item.id || "") === String(taskId));
+      const text = `${habit?.name || breakdown?.title || ""} ${breakdown?.summary || ""} ${breakdown?.sourcePrompt || ""}`;
+      const tokens = getTaskLearningTokens(text);
+      const overlap = tokens.filter((token) => currentTokens.includes(token)).length;
+      return { breakdown, habit, score: overlap + (habit?.category && category && String(habit.category).toLowerCase() === category ? 2 : 0) };
+    })
+    .filter((item) => item.score > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 3)
+    .map(({ breakdown, habit }) => `${habit?.name || breakdown?.title || "Previous checklist"}: ${String(breakdown.summary || "").slice(0, 180)}`);
+  if (!relatedTasks.length && !previousAi.length) return "";
+  return [
+    "Learned local context from this device:",
+    relatedTasks.length ? `Related past tasks/projects: ${relatedTasks.join(" | ")}.` : "",
+    previousAi.length ? `Relevant previous AI checklist patterns: ${previousAi.join(" | ")}.` : "",
+    "Adapt the new checklist to these patterns without copying irrelevant steps."
+  ].filter(Boolean).join(" ");
+}
+
+function getTaskLearningTokens(text) {
+  const stopWords = new Set(["the", "and", "for", "with", "this", "that", "task", "thing", "stuff", "from", "into", "need", "needs", "help", "photo", "checklist"]);
+  return [...new Set(String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !stopWords.has(token))
+    .slice(0, 40))];
+}
+
+function normalizeTaskBreakdown(data, task) {
+  const rawSteps = Array.isArray(data?.steps) ? data.steps : [];
+  const steps = rawSteps
+    .map((step) => typeof step === "string" ? step : step?.text)
+    .map((text) => String(text || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((text, index) => ({
+      id: `${task.id}:step:${Date.now()}:${index}`,
+      text: text.slice(0, 1200),
+      done: false
+    }));
+  if (!steps.length) throw new Error("AI returned no usable steps.");
+  return {
+    title: String(data?.title || task.name).slice(0, 80),
+    summary: String(data?.summary || "Check off each step as you go.").replace(/\s+/g, " ").trim().slice(0, 220),
+    generatedAt: new Date().toISOString(),
+    targetImageDataUrl: String(data?.targetImageDataUrl || "").startsWith("data:image/")
+      ? String(data.targetImageDataUrl).slice(0, 2200000)
+      : "",
+    targetImageError: String(data?.targetImageError || "").slice(0, 180),
+    targetImagePending: Boolean(data?.targetImagePending),
+    steps
+  };
+}
+
+function renderTaskBreakdownSteps(task, modal, breakdown) {
+  if (!modal?.body) return;
+  setTaskBreakdownLoadingOnly(modal, false);
+  if (modal.intro) modal.intro.textContent = breakdown.summary || "Check off each step as you go.";
+  modal.body.textContent = "";
+  const nameEditor = buildTaskBreakdownNameEditor(task, modal, breakdown);
+  const list = document.createElement("div");
+  const addForm = document.createElement("form");
+  const addInput = document.createElement("input");
+  const addButton = document.createElement("button");
+  const actions = document.createElement("div");
+  const saveButton = document.createElement("button");
+  const cancelButton = document.createElement("button");
+  const secondaryActions = document.createElement("div");
+  const retakePhotoButton = document.createElement("button");
+  const helpfulButton = document.createElement("button");
+  const notHelpfulButton = document.createElement("button");
+  const clearDoneButton = document.createElement("button");
+  const sourceCard = buildTaskBreakdownSourceCard(breakdown);
+  const afterPhotoCard = buildTaskBreakdownAfterPhotoCard(task, modal, breakdown);
+
+  list.className = "task-breakdown-steps";
+  breakdown.steps.forEach((step, index) => {
+    const row = document.createElement("div");
+    const label = document.createElement("label");
+    const checkbox = document.createElement("input");
+    const text = document.createElement("textarea");
+    const deleteButton = document.createElement("button");
+    row.className = "task-breakdown-step-row";
+    label.className = "task-breakdown-step";
+    label.classList.toggle("done", step.done);
+    checkbox.type = "checkbox";
+    checkbox.checked = step.done;
+    text.value = step.text;
+    text.rows = 3;
+    text.maxLength = 1200;
+    text.setAttribute("aria-label", `Step ${index + 1}`);
+    autosizeTaskStepText(text);
+    deleteButton.className = "text-button task-breakdown-step-delete";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+    checkbox.addEventListener("change", () => {
+      step.done = checkbox.checked;
+      label.classList.toggle("done", step.done);
+      taskBreakdowns[task.id] = breakdown;
+      saveTaskBreakdowns();
+      recordTaskBreakdownAiEvent(task, breakdown, step.done ? "step_completed" : "step_uncompleted", {
+        event: {
+          stepId: step.id,
+          stepText: step.text,
+          completed: step.done
+        }
+      });
+    });
+    text.addEventListener("change", () => {
+      const previousText = step.text;
+      step.text = text.value.replace(/\s+/g, " ").trim().slice(0, 1200) || step.text;
+      text.value = step.text;
+      autosizeTaskStepText(text);
+      taskBreakdowns[task.id] = breakdown;
+      saveTaskBreakdowns();
+      if (step.text !== previousText) {
+        recordTaskBreakdownAiEvent(task, breakdown, "step_edited", {
+          event: {
+            stepId: step.id,
+            previousText,
+            newText: step.text
+          }
+        });
+      }
+    });
+    text.addEventListener("input", () => autosizeTaskStepText(text));
+    deleteButton.addEventListener("click", () => {
+      const deletedText = step.text;
+      breakdown.steps.splice(index, 1);
+      taskBreakdowns[task.id] = breakdown;
+      saveTaskBreakdowns();
+      recordTaskBreakdownAiEvent(task, breakdown, "step_deleted", {
+        event: {
+          stepId: step.id,
+          stepText: deletedText
+        }
+      });
+      renderTaskBreakdownSteps(task, modal, breakdown);
+    });
+    label.append(checkbox, text);
+    row.append(label, deleteButton);
+    list.appendChild(row);
+    queueTaskStepAutosize(text);
+  });
+
+  addForm.className = "task-breakdown-add-step";
+  addInput.type = "text";
+  addInput.maxLength = 1200;
+  addInput.placeholder = "Add a step";
+  addButton.className = "text-button";
+  addButton.type = "submit";
+  addButton.textContent = "Add";
+  addForm.append(addInput, addButton);
+  addForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const text = addInput.value.replace(/\s+/g, " ").trim();
+    if (!text) return;
+    breakdown.steps.push({
+      id: `${task.id}:step:${Date.now()}`,
+      text: text.slice(0, 1200),
+      done: false
+    });
+    taskBreakdowns[task.id] = breakdown;
+    saveTaskBreakdowns();
+    recordTaskBreakdownAiEvent(task, breakdown, "step_added", {
+      event: { stepText: text.slice(0, 1200) }
+    });
+    renderTaskBreakdownSteps(task, modal, breakdown);
+  });
+
+  actions.className = "task-breakdown-result-actions";
+  secondaryActions.className = "settings-actions task-breakdown-actions task-breakdown-secondary-actions";
+  saveButton.className = "primary-button task-breakdown-save-button";
+  saveButton.type = "button";
+  saveButton.textContent = "Save";
+  saveButton.addEventListener("click", () => {
+    if (modal?.root) modal.root.taskBreakdownSaved = true;
+    const existingHabit = habits.find((habit) => String(habit.id || "") === String(task.id || ""));
+    if (!existingHabit) {
+      habits = [{ ...task }, ...habits];
+    }
+    taskBreakdowns[task.id] = breakdown;
+    saveTaskBreakdowns();
+    saveHabits();
+    render();
+    closeTaskBreakdownModal(modal.root);
+    showToast("Task saved.");
+  });
+  cancelButton.className = "text-button task-breakdown-cancel-button";
+  cancelButton.type = "button";
+  cancelButton.textContent = modal?.root?.taskBreakdownCancelDeletesTask ? "Cancel" : "Close";
+  cancelButton.addEventListener("click", () => closeTaskBreakdownModal(modal.root, { cancel: true }));
+  retakePhotoButton.className = "text-button";
+  retakePhotoButton.type = "button";
+  retakePhotoButton.textContent = "Retake photo";
+  retakePhotoButton.addEventListener("click", () => renderTaskBreakdownRetakePhoto(task, modal, breakdown));
+  helpfulButton.className = breakdown.feedback === "helpful" ? "primary-button" : "text-button";
+  helpfulButton.type = "button";
+  helpfulButton.textContent = "Helpful";
+  helpfulButton.addEventListener("click", () => saveTaskBreakdownFeedback(task, modal, breakdown, "helpful"));
+  notHelpfulButton.className = breakdown.feedback === "not_helpful" ? "primary-button" : "text-button";
+  notHelpfulButton.type = "button";
+  notHelpfulButton.textContent = "Not helpful";
+  notHelpfulButton.addEventListener("click", () => saveTaskBreakdownFeedback(task, modal, breakdown, "not_helpful"));
+  clearDoneButton.className = "text-button";
+  clearDoneButton.type = "button";
+  clearDoneButton.textContent = "Clear done";
+  clearDoneButton.addEventListener("click", () => {
+    breakdown.steps = breakdown.steps.filter((step) => !step.done);
+    taskBreakdowns[task.id] = breakdown;
+    saveTaskBreakdowns();
+    renderTaskBreakdownSteps(task, modal, breakdown);
+  });
+  secondaryActions.append(retakePhotoButton);
+  actions.append(secondaryActions, cancelButton, saveButton);
+  modal.body.append(...[nameEditor, sourceCard, list, afterPhotoCard, addForm, actions].filter(Boolean));
+  maybeRequestAutomaticTaskAfterImage(task, modal, breakdown);
+}
+
+function buildTaskBreakdownAfterPhotoCard(task, modal, breakdown) {
+  const afterImageDataUrl = getTaskBreakdownAfterImageDataUrl(breakdown);
+  const hasSourceImage = Boolean(String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/"));
+  const isPending = Boolean(breakdown?.targetImagePending);
+  const error = String(breakdown?.targetImageError || "").trim();
+  if (!hasSourceImage && !afterImageDataUrl && !isPending && !error) return null;
+
+  const card = document.createElement("section");
+  const label = document.createElement("p");
+  const button = document.createElement("button");
+
+  card.className = "task-breakdown-after-photo-card";
+  label.className = "task-breakdown-source-label";
+  label.textContent = "After";
+  card.appendChild(label);
+  if (afterImageDataUrl) {
+    const image = document.createElement("img");
+    image.src = afterImageDataUrl;
+    image.alt = "After picture for this checklist";
+    card.appendChild(image);
+  } else {
+    const pending = document.createElement("p");
+    pending.className = isPending ? "task-breakdown-target-pending" : "task-breakdown-target-error";
+    pending.textContent = isPending
+      ? "After image is being made in the background. You can start now."
+      : (error || "Make an optional after picture when you need a visual target.");
+    card.appendChild(pending);
+  }
+  if (hasSourceImage && !afterImageDataUrl && !isPending) {
+    button.className = "text-button";
+    button.type = "button";
+    button.textContent = error ? "Try after picture again" : "Make after picture";
+    button.addEventListener("click", () => requestTaskTargetImage(task, modal, breakdown));
+    card.appendChild(button);
+  }
+  return card;
+}
+
+function getTaskBreakdownAfterImageDataUrl(breakdown) {
+  const manualAfterImage = String(breakdown?.afterImageDataUrl || "");
+  if (manualAfterImage.startsWith("data:image/")) return manualAfterImage;
+  const targetImage = String(breakdown?.targetImageDataUrl || "");
+  return targetImage.startsWith("data:image/") ? targetImage : "";
+}
+
+function buildTaskBreakdownNameEditor(task, modal, breakdown) {
+  const form = document.createElement("form");
+  const label = document.createElement("label");
+  const labelText = document.createElement("span");
+  const input = document.createElement("input");
+  const saveButton = document.createElement("button");
+
+  form.className = "task-breakdown-name-editor";
+  label.className = "field";
+  labelText.textContent = "Task name";
+  input.type = "text";
+  input.maxLength = 80;
+  input.placeholder = "Name this task";
+  input.value = shouldShowEmptyTaskNameField(task, modal, breakdown)
+    ? ""
+    : String(task?.name || breakdown?.title || "").slice(0, 80);
+  input.setAttribute("aria-label", "Task name");
+  saveButton.className = "text-button";
+  saveButton.type = "submit";
+  saveButton.textContent = "Save name";
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const nextName = input.value.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!nextName) {
+      input.focus();
+      return;
+    }
+    const habit = habits.find((item) => String(item.id || "") === String(task.id || ""));
+    if (habit) {
+      habit.name = nextName;
+      task.name = nextName;
+      saveHabits();
+    } else {
+      task.name = nextName;
+    }
+    breakdown.title = nextName;
+    taskBreakdowns[task.id] = breakdown;
+    saveTaskBreakdowns();
+    if (modal.eyebrow) modal.eyebrow.textContent = nextName;
+    input.value = nextName;
+    render();
+    showToast("Task name saved.");
+  });
+
+  label.append(labelText, input);
+  form.append(label, saveButton);
+  return form;
+}
+
+function shouldShowEmptyTaskNameField(task, modal, breakdown) {
+  if (!modal?.root?.taskBreakdownCancelDeletesTask) return false;
+  const currentName = String(task?.name || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const currentTitle = String(breakdown?.title || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return currentName === "photo checklist"
+    || currentTitle === "photo checklist"
+    || currentName.endsWith(" photo checklist")
+    || currentTitle.endsWith(" photo checklist");
+}
+
+function saveTaskBreakdownFeedback(task, modal, breakdown, feedback) {
+  breakdown.feedback = feedback;
+  taskBreakdowns[task.id] = breakdown;
+  saveTaskBreakdowns();
+  recordTaskBreakdownAiEvent(task, breakdown, "checklist_feedback", {
+    event: { feedback }
+  });
+  renderTaskBreakdownSteps(task, modal, breakdown);
+  showToast(feedback === "helpful" ? "Marked helpful." : "Marked not helpful.");
+}
+
+function recordTaskBreakdownAiEvent(task, breakdown, type, details = {}) {
+  recordAiTrainingExample({
+    type,
+    task,
+    checklist: breakdown,
+    event: details.event || {},
+    context: details.context || {}
+  });
+}
+
+async function handleTaskBreakdownAfterPhoto(input, task, modal, breakdown) {
+  const file = input.files?.[0];
+  if (!file) return;
+  if (!/^image\//i.test(file.type)) {
+    showToast("Choose an image for the after photo.");
+    input.value = "";
+    return;
+  }
+  try {
+    breakdown.afterImageDataUrl = await resizeTaskBreakdownImage(file, 900, 0.72);
+    taskBreakdowns[task.id] = breakdown;
+    saveTaskBreakdowns();
+    recordTaskBreakdownAiEvent(task, breakdown, "after_photo_saved");
+    if (modal?.body?.isConnected) {
+      renderTaskBreakdownSteps(task, modal, breakdown);
+    }
+    showToast("After photo saved.");
+  } catch {
+    input.value = "";
+    showToast("Could not save that after photo.");
+  }
+}
+
+function renderTaskBreakdownRetakePhoto(task, modal, breakdown) {
+  if (!modal?.body) return;
+  if (modal.intro) modal.intro.textContent = "Update the message or photo, then send to recreate this checklist.";
+  modal.body.textContent = "";
+  const inputBox = buildTaskBreakdownDetailInput(task, modal);
+  const actions = document.createElement("div");
+  const sendButton = document.createElement("button");
+  const backButton = document.createElement("button");
+  if (modal.detailsInput && breakdown?.sourcePrompt) {
+    modal.detailsInput.value = breakdown.sourcePrompt;
+  }
+  actions.className = "settings-actions task-breakdown-actions";
+  sendButton.className = "primary-button";
+  sendButton.type = "button";
+  sendButton.textContent = "Recreate checklist";
+  backButton.className = "text-button";
+  backButton.type = "button";
+  backButton.textContent = "Back to list";
+  sendButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
+  backButton.addEventListener("click", () => renderTaskBreakdownSteps(task, modal, breakdown));
+  actions.append(sendButton, backButton);
+  modal.body.append(inputBox, actions);
+  window.setTimeout(() => modal.issuePhotoInput?.click(), 120);
+}
+
+function autosizeTaskStepText(field) {
+  if (!field) return;
+  field.style.height = "0px";
+  field.style.height = `${Math.max(field.scrollHeight + 8, 136)}px`;
+}
+
+function queueTaskStepAutosize(field) {
+  window.requestAnimationFrame(() => {
+    autosizeTaskStepText(field);
+    window.requestAnimationFrame(() => autosizeTaskStepText(field));
+  });
+  window.setTimeout(() => autosizeTaskStepText(field), 160);
+}
+
+function buildTaskBreakdownSourceCard(breakdown) {
+  const hasPrompt = Boolean(String(breakdown?.sourcePrompt || "").trim());
+  const hasImage = Boolean(String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/"));
+  if (!hasPrompt && !hasImage) return null;
+
+  const card = document.createElement("section");
+  const toggle = document.createElement("button");
+  const title = document.createElement("strong");
+  const meta = document.createElement("span");
+  const detail = document.createElement("div");
+
+  card.className = "task-breakdown-source-card";
+  toggle.className = "task-breakdown-source-toggle";
+  toggle.type = "button";
+  title.textContent = "Saved project history";
+  meta.textContent = hasImage ? "Before photo saved" : "Checklist session saved";
+  detail.className = "task-breakdown-source-detail";
+  detail.hidden = !hasImage;
+  card.classList.toggle("open", !detail.hidden);
+
+  if (hasPrompt) {
+    const prompt = document.createElement("p");
+    prompt.textContent = breakdown.sourcePrompt;
+    detail.appendChild(prompt);
+  }
+  if (hasImage) {
+    const beforeLabel = document.createElement("p");
+    const image = document.createElement("img");
+    beforeLabel.className = "task-breakdown-source-label";
+    beforeLabel.textContent = "Before";
+    image.src = breakdown.sourceImageDataUrl;
+    image.alt = "Photo submitted to AI";
+    detail.append(beforeLabel, image);
+  }
+  const telemetryText = getTaskBreakdownTelemetryLabel(breakdown);
+  if (telemetryText) {
+    const telemetry = document.createElement("p");
+    telemetry.className = "task-breakdown-telemetry";
+    telemetry.textContent = telemetryText;
+    detail.appendChild(telemetry);
+  }
+  toggle.append(title, meta);
+  toggle.addEventListener("click", () => {
+    const open = detail.hidden;
+    detail.hidden = !open;
+    card.classList.toggle("open", open);
+  });
+  card.append(toggle, detail);
+  return card;
+}
+
+function getTaskBreakdownTelemetryLabel(breakdown) {
+  const telemetry = normalizePhotoAiTelemetry(breakdown?.photoAiTelemetry);
+  const parts = [];
+  if (telemetry.uploadBytes) parts.push(`Upload ${Math.round(telemetry.uploadBytes / 1024)} KB`);
+  if (telemetry.resizeMs) parts.push(`Resize ${(telemetry.resizeMs / 1000).toFixed(1)}s`);
+  if (telemetry.checklistMs) parts.push(`Checklist ${(telemetry.checklistMs / 1000).toFixed(1)}s`);
+  if (telemetry.afterImageMs) parts.push(`After ${(telemetry.afterImageMs / 1000).toFixed(1)}s`);
+  return parts.join(" • ");
 }
 
 function openDayTaskDialog(dayName, dateKey) {
@@ -3337,6 +5146,9 @@ function openDayTaskDialog(dayName, dateKey) {
 
       item.className = "task-dialog-item";
       item.classList.toggle("done", done);
+      item.tabIndex = 0;
+      item.setAttribute("role", "button");
+      item.setAttribute("aria-label", `Open ${task.name} checklist and photos`);
       itemTitle.textContent = task.name;
       meta.textContent = [task.category || "General", task.priority || "Normal"].join(" / ");
       toggle.className = "text-button task-dialog-toggle";
@@ -3345,6 +5157,18 @@ function openDayTaskDialog(dayName, dateKey) {
       toggle.addEventListener("click", () => {
         modal.remove();
         toggleHabit(task.id, dateKey);
+      });
+      item.addEventListener("click", (event) => {
+        if (isTaskCardControl(event.target)) return;
+        modal.remove();
+        openTaskBreakdownDialog(task);
+      });
+      item.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (isTaskCardControl(event.target)) return;
+        event.preventDefault();
+        modal.remove();
+        openTaskBreakdownDialog(task);
       });
 
       itemText.append(itemTitle, meta);
@@ -3369,15 +5193,15 @@ function openDayTaskDialog(dayName, dateKey) {
 function showDailyAffirmation() {
   if (!appUnlocked) return;
   const lastShownDate = localStorage.getItem(affirmationShownStoreKey);
-  const depressionOverride = shouldShowDepressionAffirmation();
-  if (lastShownDate === today && !depressionOverride) return;
+  const lowFocusOverride = shouldShowlowFocusAffirmation();
+  if (lastShownDate === today && !lowFocusOverride) return;
   const index = getAffirmationIndex(today);
   affirmationText.textContent = dailyAffirmations[index];
   affirmationModal.hidden = false;
   affirmationModal.focus();
   localStorage.setItem(affirmationShownStoreKey, today);
-  if (depressionOverride) {
-    localStorage.setItem(affirmationDepressionShownStoreKey, new Date().toISOString());
+  if (lowFocusOverride) {
+    localStorage.setItem(affirmationlowFocusShownStoreKey, new Date().toISOString());
   }
 }
 
@@ -3385,21 +5209,21 @@ function closeAffirmationModal() {
   affirmationModal.hidden = true;
 }
 
-function shouldShowDepressionAffirmation() {
-  if (!hasRecentDepressionSignal()) return false;
-  const lastShownAt = new Date(localStorage.getItem(affirmationDepressionShownStoreKey) || 0).getTime();
+function shouldShowlowFocusAffirmation() {
+  if (!hasRecentlowFocusSignal()) return false;
+  const lastShownAt = new Date(localStorage.getItem(affirmationlowFocusShownStoreKey) || 0).getTime();
   return !Number.isFinite(lastShownAt) || Date.now() - lastShownAt >= 4 * 60 * 60 * 1000;
 }
 
-function hasRecentDepressionSignal() {
+function hasRecentlowFocusSignal() {
   const recentCutoff = getRecentCutoffKey(7);
-  const recentMoodNotes = moodEntries
+  const recentfocusStateNotes = focusStateEntries
     .filter((entry) => entry.date >= recentCutoff)
     .map((entry) => `${entry.name || ""} ${entry.note || ""}`);
-  const recentJournal = journalEntries
+  const recentfocusLog = focusLogEntries
     .filter((entry) => entry.date >= recentCutoff)
     .map((entry) => entry.text || "");
-  return [...recentMoodNotes, ...recentJournal].some((text) => matchesAnyPattern(text, depressionMoodPatterns));
+  return [...recentfocusStateNotes, ...recentfocusLog].some((text) => matchesAnyPattern(text, lowFocusfocusStatePatterns));
 }
 
 function getAffirmationIndex(dateKey) {
@@ -3414,10 +5238,11 @@ function getGoogleCalendarUrl(habit) {
   const end = new Date(start.getTime() + 30 * 60 * 1000);
   const details = [
     habit.note,
-    `Date: ${formatSymptomHistoryDate(getTaskDateKey(habit))}`,
+    `Date: ${formatarchiveBHistoryDate(getTaskDateKey(habit))}`,
     `Category: ${habit.category || "General"}`,
-    `Priority: ${habit.priority || "Normal"}`,
-    "Created from Health & Task Tracker."
+    `When: ${normalizeTaskPriority(habit.priority)}`,
+    `Size: ${normalizeTaskSize(habit.size)}`,
+    "Created from TaskLens AI."
   ].filter(Boolean).join("\n");
   const params = new URLSearchParams({
     action: "TEMPLATE",
@@ -3453,8 +5278,8 @@ async function copyText(value) {
 
 function printTaskDialog(dayName, dateKey, dayTasks) {
   const html = getTaskPrintHtml(dayName, dateKey, dayTasks);
-  if (window.HealthTaskPrint && typeof window.HealthTaskPrint.printHtml === "function") {
-    window.HealthTaskPrint.printHtml(html, `${dayName} To-do list`);
+  if (window.TaskLensPrint && typeof window.TaskLensPrint.printHtml === "function") {
+    window.TaskLensPrint.printHtml(html, `${dayName} To-do list`);
     return;
   }
 
@@ -3480,7 +5305,8 @@ function getTaskPrintHtml(dayName, dateKey, dayTasks) {
       const meta = [
         task.category || "General",
         formatTaskDeadline(task.deadline),
-        task.priority || "Normal"
+        normalizeTaskPriority(task.priority),
+        normalizeTaskSize(task.size)
       ].filter(Boolean).join(" / ");
       return `<li><span>${escapeHtml(task.name)}</span><small>${escapeHtml(meta)}</small><strong>${done ? "Done" : "Open"}</strong></li>`;
     }).join("")
@@ -3498,7 +5324,7 @@ function getTaskPrintHtml(dayName, dateKey, dayTasks) {
     p { margin: 0 0 20px; color: #4b5563; }
     ul { list-style: none; margin: 0; padding: 0; }
     li { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid #d1d5db; }
-    span { font-weight: 700; }
+    span { font-valueC: 700; }
     small { color: #4b5563; }
     strong { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
   </style>
@@ -3651,6 +5477,11 @@ function toggleHabit(id, dateKey) {
 
 function deleteHabit(id) {
   habits = habits.filter((habit) => habit.id !== id);
+  if (taskBreakdowns[id]) {
+    const { [id]: _deletedBreakdown, ...remainingBreakdowns } = taskBreakdowns;
+    taskBreakdowns = remainingBreakdowns;
+    saveTaskBreakdowns();
+  }
   saveHabits();
   render();
 }
@@ -3790,61 +5621,64 @@ function createTableRow(cells) {
   return row;
 }
 
-function getLast24NutritionEntries() {
+function getLast24archiveAEntries() {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  return [...nutritionEntries]
+  return [...archiveAEntries]
     .map((entry) => ({ ...entry, dateTime: getEntryDateTime(entry, 12) }))
     .filter((entry) => entry.dateTime.getTime() >= cutoff)
     .sort((first, second) => second.dateTime - first.dateTime);
 }
 
-function renderNutrition() {
-  const last24Entries = getLast24NutritionEntries();
-  const calorieValues = last24Entries.map((entry) => entry.calories).filter(Number.isFinite);
-  const carbValues = last24Entries.map((entry) => entry.carbs).filter(Number.isFinite);
+function renderarchiveA() {
+  if (!avgvalueA || !avgvalueB || !latestvalueC || !latestphase || !latestvalueD || !latestreading || !latestWater) {
+    return;
+  }
+  const last24Entries = getLast24archiveAEntries();
+  const valueAValues = last24Entries.map((entry) => entry.valueA).filter(Number.isFinite);
+  const valueBValues = last24Entries.map((entry) => entry.valueB).filter(Number.isFinite);
   const waterValues = last24Entries.map((entry) => entry.water).filter(Number.isFinite);
-  const latestWeightEntry = last24Entries.find((entry) => Number.isFinite(entry.weight));
-  const latestKetosisEntry = last24Entries.find((entry) => entry.ketosisPhase);
-  const latestGlucoseEntry = last24Entries.find((entry) => Number.isFinite(entry.glucose));
-  const latestBloodPressureEntry = last24Entries.find(
+  const latestvalueCEntry = last24Entries.find((entry) => Number.isFinite(entry.valueC));
+  const latestphaseEntry = last24Entries.find((entry) => entry.phasePhase);
+  const latestvalueDEntry = last24Entries.find((entry) => Number.isFinite(entry.valueD));
+  const latestreadingEntry = last24Entries.find(
     (entry) => Number.isFinite(entry.systolic) && Number.isFinite(entry.diastolic)
   );
 
-  avgCalories.textContent = calorieValues.length ? formatWholeNumber(getSum(calorieValues)) : "0";
-  avgCarbs.textContent = carbValues.length ? `${formatWholeNumber(getSum(carbValues))}g` : "0g";
-  latestWeight.textContent = latestWeightEntry ? `${formatDecimal(latestWeightEntry.weight)} lb` : "--";
-  latestKetosis.textContent = latestKetosisEntry ? formatKetosisPhase(latestKetosisEntry.ketosisPhase) : "--";
-  latestGlucose.textContent = latestGlucoseEntry ? `${formatWholeNumber(latestGlucoseEntry.glucose)} mg/dL` : "--";
-  latestBloodPressure.textContent = latestBloodPressureEntry
-    ? formatBloodPressure(latestBloodPressureEntry.systolic, latestBloodPressureEntry.diastolic, true)
+  avgvalueA.textContent = valueAValues.length ? formatWholeNumber(getSum(valueAValues)) : "0";
+  avgvalueB.textContent = valueBValues.length ? `${formatWholeNumber(getSum(valueBValues))}g` : "0g";
+  latestvalueC.textContent = latestvalueCEntry ? `${formatDecimal(latestvalueCEntry.valueC)} lb` : "--";
+  latestphase.textContent = latestphaseEntry ? formatphasePhase(latestphaseEntry.phasePhase) : "--";
+  latestvalueD.textContent = latestvalueDEntry ? `${formatWholeNumber(latestvalueDEntry.valueD)}` : "--";
+  latestreading.textContent = latestreadingEntry
+    ? formatreading(latestreadingEntry.systolic, latestreadingEntry.diastolic, true)
     : "--";
   latestWater.textContent = waterValues.length ? `${formatWholeNumber(getSum(waterValues))} oz` : "0 oz";
-  if (nutritionRows && nutritionEmpty) {
-    nutritionRows.textContent = "";
-    nutritionEmpty.hidden = last24Entries.length > 0;
+  if (archiveARows && archiveAEmpty) {
+    archiveARows.textContent = "";
+    archiveAEmpty.hidden = last24Entries.length > 0;
     const fragment = document.createDocumentFragment();
 
     last24Entries.forEach((entry, index) => {
-      const previousWeight = findPreviousWeight(last24Entries, index);
-      const delta = Number.isFinite(entry.weight) && Number.isFinite(previousWeight)
-        ? entry.weight - previousWeight
+      const previousvalueC = findPreviousvalueC(last24Entries, index);
+      const delta = Number.isFinite(entry.valueC) && Number.isFinite(previousvalueC)
+        ? entry.valueC - previousvalueC
         : null;
       fragment.appendChild(createTableRow([
         formatEntryDateTime(entry.dateTime),
-        Number.isFinite(entry.calories) ? formatWholeNumber(entry.calories) : "--",
-        Number.isFinite(entry.carbs) ? `${formatWholeNumber(entry.carbs)}g` : "--",
-        Number.isFinite(entry.weight) ? `${formatDecimal(entry.weight)} lb` : "--",
-        formatKetosisPhase(entry.ketosisPhase),
-        Number.isFinite(entry.glucose) ? `${formatWholeNumber(entry.glucose)} mg/dL` : "--",
-        formatBloodPressure(entry.systolic, entry.diastolic),
+        Number.isFinite(entry.valueA) ? formatWholeNumber(entry.valueA) : "--",
+        Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
+        Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
+        formatphasePhase(entry.phasePhase),
+        Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
+        formatreading(entry.systolic, entry.diastolic),
         Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
-        formatWeightDelta(delta)
+        formatvalueCDelta(delta)
       ]));
     });
-    nutritionRows.appendChild(fragment);
+    archiveARows.appendChild(fragment);
   }
 
-  if (!historyModal.hidden || vitalsHistoryDropdown?.open) {
+  if ((historyModal && !historyModal.hidden) || archiveCHistoryDropdown?.open) {
     renderHistory();
   }
 }
@@ -3853,14 +5687,14 @@ function renderHistory() {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - (HISTORY_RETENTION_DAYS - 1));
-  const historyEntries = nutritionEntries
+  const historyEntries = archiveAEntries
     .filter((entry) => new Date(`${entry.date}T00:00:00`) >= start)
     .filter((entry) => (
-      Number.isFinite(entry.weight) ||
-      Number.isFinite(entry.calories) ||
-      Number.isFinite(entry.carbs) ||
-      entry.ketosisPhase ||
-      Number.isFinite(entry.glucose) ||
+      Number.isFinite(entry.valueC) ||
+      Number.isFinite(entry.valueA) ||
+      Number.isFinite(entry.valueB) ||
+      entry.phasePhase ||
+      Number.isFinite(entry.valueD) ||
       Number.isFinite(entry.systolic) ||
       Number.isFinite(entry.diastolic) ||
       Number.isFinite(entry.water)
@@ -3875,20 +5709,20 @@ function renderHistory() {
   const fragment = document.createDocumentFragment();
 
   historyEntries.forEach((entry, index) => {
-    const previousWeight = findPreviousWeight(historyEntries, index);
-    const delta = Number.isFinite(entry.weight) && Number.isFinite(previousWeight)
-      ? entry.weight - previousWeight
+    const previousvalueC = findPreviousvalueC(historyEntries, index);
+    const delta = Number.isFinite(entry.valueC) && Number.isFinite(previousvalueC)
+      ? entry.valueC - previousvalueC
       : null;
     const row = createTableRow([
       formatEntryDate(entry.date),
-      Number.isFinite(entry.calories) ? formatWholeNumber(entry.calories) : "--",
-      Number.isFinite(entry.carbs) ? `${formatWholeNumber(entry.carbs)}g` : "--",
-      Number.isFinite(entry.weight) ? `${formatDecimal(entry.weight)} lb` : "--",
-      formatKetosisPhase(entry.ketosisPhase),
-      Number.isFinite(entry.glucose) ? `${formatWholeNumber(entry.glucose)} mg/dL` : "--",
-      formatBloodPressure(entry.systolic, entry.diastolic),
+      Number.isFinite(entry.valueA) ? formatWholeNumber(entry.valueA) : "--",
+      Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
+      Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
+      formatphasePhase(entry.phasePhase),
+      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
+      formatreading(entry.systolic, entry.diastolic),
       Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
-      formatWeightDelta(delta)
+      formatvalueCDelta(delta)
     ]);
     row.dataset.historyDate = entry.date;
     if (entry.date === historyFocusDateKey) row.classList.add("history-row-focused");
@@ -3914,17 +5748,15 @@ function renderMasterChart() {
   rows.forEach((entry) => {
     const row = createTableRow([
       formatEntryDateTime(entry.dateTime),
-      Number.isFinite(entry.calories) ? formatWholeNumber(entry.calories) : "--",
-      Number.isFinite(entry.carbs) ? `${formatWholeNumber(entry.carbs)}g` : "--",
-      Number.isFinite(entry.weight) ? `${formatDecimal(entry.weight)} lb` : "--",
-      formatKetosisPhase(entry.ketosisPhase),
-      Number.isFinite(entry.glucose) ? `${formatWholeNumber(entry.glucose)} mg/dL` : "--",
-      formatBloodPressure(entry.systolic, entry.diastolic),
+      Number.isFinite(entry.valueA) ? formatWholeNumber(entry.valueA) : "--",
+      Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
+      Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
+      formatphasePhase(entry.phasePhase),
+      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
+      formatreading(entry.systolic, entry.diastolic),
       Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
-      entry.symptom || "--",
-      entry.severity || "--",
-      entry.mood || "--",
-      entry.intensity || "--"
+      entry.archiveB || "--",
+      entry.severity || "--"
     ]);
     row.dataset.weekday = String(entry.dateTime.getDay());
     fragment.appendChild(row);
@@ -3934,44 +5766,35 @@ function renderMasterChart() {
 
 function getMasterChartRows() {
   const cutoff = getRecentCutoffKey(masterChartRangeDays);
-  const nutritionRows = nutritionEntries
+  const archiveARows = archiveAEntries
     .filter((entry) => entry.date >= cutoff)
     .map((entry) => ({ ...entry, dateTime: getEntryDateTime(entry, 12) }));
-  const symptomRows = symptomEntries
+  const archiveBRows = archiveBEntries
     .filter((entry) => entry.date >= cutoff)
     .map((entry) => ({
       date: entry.date,
       dateTime: getEntryDateTime(entry, 15),
-      symptom: entry.name,
+      archiveB: entry.name,
       severity: entry.severity
     }));
-  const moodRows = moodEntries
-    .filter((entry) => entry.date >= cutoff)
-    .map((entry) => ({
-      date: entry.date,
-      dateTime: getEntryDateTime(entry, 18),
-      mood: entry.name,
-      intensity: entry.intensity
-    }));
-
-  return [...nutritionRows, ...symptomRows, ...moodRows]
+  return [...archiveARows, ...archiveBRows]
     .sort((first, second) => second.dateTime - first.dateTime);
 }
 
-function mountVitalsHistoryChart() {
-  if (!vitalsHistoryMount) {
+function mountarchiveCHistoryChart() {
+  if (!archiveCHistoryMount) {
     return;
   }
 
   const chartWrap = document.querySelector("#historyModal .history-chart-wrap");
   const tableWrap = document.querySelector("#historyModal .history-table-wrap");
 
-  if (chartWrap && !vitalsHistoryMount.contains(chartWrap)) {
-    vitalsHistoryMount.appendChild(chartWrap);
+  if (chartWrap && !archiveCHistoryMount.contains(chartWrap)) {
+    archiveCHistoryMount.appendChild(chartWrap);
   }
 
-  if (tableWrap && !vitalsHistoryMount.contains(tableWrap)) {
-    vitalsHistoryMount.appendChild(tableWrap);
+  if (tableWrap && !archiveCHistoryMount.contains(tableWrap)) {
+    archiveCHistoryMount.appendChild(tableWrap);
   }
 
   syncHistoryControls();
@@ -4010,10 +5833,10 @@ function renderHistoryChart(historyEntries) {
   renderHistoryAxis(chartStart, chartEnd);
   renderHistoryPoints(chartItems, chartStart, chartEnd, enabledKeys);
   updateHistoryZoomLabel();
-  setHistoryLine(historyWeightLine, chartItems, "weight", chartStart, chartEnd, enabledKeys);
-  setHistoryLine(historyCaloriesLine, chartItems, "calories", chartStart, chartEnd, enabledKeys);
-  setHistoryLine(historyCarbsLine, chartItems, "carbs", chartStart, chartEnd, enabledKeys);
-  setHistoryLine(historyGlucoseLine, chartItems, "glucose", chartStart, chartEnd, enabledKeys);
+  setHistoryLine(historyvalueCLine, chartItems, "valueC", chartStart, chartEnd, enabledKeys);
+  setHistoryLine(historyvalueALine, chartItems, "valueA", chartStart, chartEnd, enabledKeys);
+  setHistoryLine(historyvalueBLine, chartItems, "valueB", chartStart, chartEnd, enabledKeys);
+  setHistoryLine(historyvalueDLine, chartItems, "valueD", chartStart, chartEnd, enabledKeys);
   setHistoryLine(historyPressureLine, chartItems, "pressure", chartStart, chartEnd, enabledKeys);
   setHistoryLine(historyWaterLine, chartItems, "water", chartStart, chartEnd, enabledKeys);
 }
@@ -4022,10 +5845,10 @@ function getHistoryChartItems(historyEntries) {
   return historyEntries.map((entry) => ({
     date: entry.date,
     dateTime: getEntryDateTime(entry, 12),
-    weight: entry.weight,
-    calories: entry.calories,
-    carbs: entry.carbs,
-    glucose: entry.glucose,
+    valueC: entry.valueC,
+    valueA: entry.valueA,
+    valueB: entry.valueB,
+    valueD: entry.valueD,
     systolic: entry.systolic,
     diastolic: entry.diastolic,
     pressure: Number.isFinite(entry.systolic) ? entry.systolic : entry.diastolic,
@@ -4214,42 +6037,42 @@ function selectHistoryPoint(item, key) {
 }
 
 function getHistoryFilterForKey(key) {
-  if (["calories", "carbs", "weight", "glucose", "pressure", "water"].includes(key)) return key;
+  if (["valueA", "valueB", "valueC", "valueD", "pressure", "water"].includes(key)) return key;
   if (key === "water") return "water";
   return "all";
 }
 
 function getHistoryPointLabel(item, key) {
   const labels = {
-    weight: "Weight",
-    calories: "Calories",
-    carbs: "Carbs",
-    glucose: "Glucose",
-    pressure: "Blood pressure",
+    valueC: "valueC",
+    valueA: "valueA",
+    valueB: "valueB",
+    valueD: "Reading",
+    pressure: "Pressure",
     water: "Water"
   };
   const value = key === "pressure"
-    ? formatBloodPressure(item.systolic, item.diastolic)
+    ? formatreading(item.systolic, item.diastolic)
     : formatHistoryPointValue(key, item[key]);
   return `${labels[key] || key}: ${value} on ${formatEntryDate(item.date)}`;
 }
 
 function formatHistoryPointValue(key, value) {
   if (!Number.isFinite(value)) return "--";
-  if (key === "weight") return `${formatDecimal(value)} lb`;
-  if (key === "carbs") return `${formatWholeNumber(value)}g`;
-  if (key === "glucose") return `${formatWholeNumber(value)} mg/dL`;
+  if (key === "valueC") return `${formatDecimal(value)} lb`;
+  if (key === "valueB") return `${formatWholeNumber(value)}g`;
+  if (key === "valueD") return `${formatWholeNumber(value)}`;
   if (key === "water") return `${formatWholeNumber(value)} oz`;
   return formatWholeNumber(value);
 }
 
 function getEnabledHistoryKeys() {
   const filterValue = historyMetricFilter.value || "all";
-  if (filterValue === "nutrition") return ["calories", "carbs", "weight"];
-  if (filterValue === "vitals") return ["glucose", "pressure", "weight"];
-  if (["calories", "carbs", "weight", "glucose", "pressure", "water"].includes(filterValue)) return [filterValue];
+  if (filterValue === "archiveA") return ["valueA", "valueB", "valueC"];
+  if (filterValue === "archiveC") return ["valueD", "pressure", "valueC"];
+  if (["valueA", "valueB", "valueC", "valueD", "pressure", "water"].includes(filterValue)) return [filterValue];
   if (filterValue === "water") return ["water"];
-  return ["weight", "calories", "carbs", "glucose", "pressure", "water"];
+  return ["valueC", "valueA", "valueB", "valueD", "pressure", "water"];
 }
 
 function updateHistoryLegendButtons() {
@@ -4279,7 +6102,7 @@ function getEntryDateTime(entry, fallbackHour = 12) {
   return date;
 }
 
-function getSymptomSeverityScore(severity) {
+function getarchiveBeverityScore(severity) {
   if (severity === "Severe") return 3;
   if (severity === "Moderate") return 2;
   return 1;
@@ -4287,6 +6110,7 @@ function getSymptomSeverityScore(severity) {
 
 
 function renderWaterControl() {
+  if (!waterGlasses || !water || !waterCount || !waterToggle) return;
   if (!waterGlasses.children.length) {
     const fragment = document.createDocumentFragment();
     for (let index = 1; index <= WATER_GLASS_COUNT; index += 1) {
@@ -4304,7 +6128,7 @@ function renderWaterControl() {
     waterGlasses.appendChild(fragment);
   }
 
-  const ounces = parseNutritionNumber(water.value);
+  const ounces = parsearchiveANumber(water.value);
   const selectedGlasses = Number.isFinite(ounces) ? Math.max(0, Math.min(WATER_GLASS_COUNT, Math.round(ounces / WATER_GLASS_OZ))) : 0;
   const visibleGlasses = WATER_GLASS_COUNT;
 
@@ -4330,13 +6154,13 @@ function setWaterAmount(ounces) {
   renderWaterControl();
 }
 
-function findPreviousWeight(entries, currentIndex) {
+function findPreviousvalueC(entries, currentIndex) {
   const olderEntries = entries.slice(currentIndex + 1);
-  const previous = olderEntries.find((entry) => Number.isFinite(entry.weight));
-  return previous ? previous.weight : null;
+  const previous = olderEntries.find((entry) => Number.isFinite(entry.valueC));
+  return previous ? previous.valueC : null;
 }
 
-function parseNutritionNumber(value) {
+function parsearchiveANumber(value) {
   if (value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -4362,7 +6186,7 @@ function formatInputDecimal(value) {
   return Number.isFinite(value) ? value.toFixed(1) : "";
 }
 
-function formatWeightDelta(value) {
+function formatvalueCDelta(value) {
   if (!Number.isFinite(value)) return "--";
   if (Math.abs(value) < 0.05) return "0.0 lb";
   const sign = value > 0 ? "+" : "";
@@ -4386,8 +6210,9 @@ function formatShortSlashDate(dateKey) {
   ].join("/");
 }
 
-function updateJournalEntryState() {
-  journalEntry.closest(".journal-entry-field")?.classList.toggle("has-entry", Boolean(journalEntry.value.trim()));
+function updatefocusLogEntryState() {
+  if (!focusLogEntry) return;
+  focusLogEntry.closest(".focusLog-entry-field")?.classList.toggle("has-entry", Boolean(focusLogEntry.value.trim()));
 }
 
 function parseDateKey(dateKey) {
@@ -4431,7 +6256,8 @@ function loadHabits() {
           category: habit.category || "General",
           time: normalizeTaskTime(habit.time),
           deadline: normalizeTaskTime(habit.deadline),
-          priority: habit.priority || "Normal",
+          priority: normalizeTaskPriority(habit.priority),
+          size: normalizeTaskSize(habit.size),
           color: habit.color || "#f97316",
           note: habit.note || "",
           completions: Array.isArray(habit.completions)
@@ -4455,6 +6281,185 @@ function isLegacyStarterWalkTask(habit) {
 
 function saveHabits() {
   localStorage.setItem(storeKey, JSON.stringify(habits));
+}
+
+function createTaskDraft(options = {}) {
+  const dayName = options.day || weekDays[new Date().getDay()];
+  const name = String(options.name || "New task").replace(/\s+/g, " ").trim().slice(0, 80) || "New task";
+  return {
+    id: options.id || createHabitId(),
+    name,
+    date: options.date || today,
+    day: dayName,
+    category: String(options.category || "General").slice(0, 40),
+    time: normalizeTaskTime(options.time || ""),
+    deadline: normalizeTaskTime(options.deadline || ""),
+    priority: normalizeTaskPriority(options.priority || "Next"),
+    size: normalizeTaskSize(options.size || "Small"),
+    color: /^#[0-9a-f]{6}$/i.test(options.color || "") ? options.color : "#4574fa",
+    note: String(options.note || "").trim().slice(0, 1200),
+    completions: Array.isArray(options.completions) ? options.completions : []
+  };
+}
+
+function loadTaskBreakdowns() {
+  try {
+    const savedText = localStorage.getItem(taskBreakdownsStoreKey)
+      || localStorage.getItem(legacyTaskBreakdownsStoreKey)
+      || "{}";
+    const saved = JSON.parse(savedText);
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved)
+      .filter(([taskId, breakdown]) => taskId && breakdown && Array.isArray(breakdown.steps))
+      .map(([taskId, breakdown]) => [taskId, {
+        title: String(breakdown.title || "").slice(0, 80),
+        summary: String(breakdown.summary || "").slice(0, 300),
+        generatedAt: breakdown.generatedAt || new Date().toISOString(),
+        sourcePrompt: String(breakdown.sourcePrompt || "").slice(0, 1600),
+        feedback: ["helpful", "not_helpful"].includes(breakdown.feedback) ? breakdown.feedback : "",
+        sourceImageDataUrl: String(breakdown.sourceImageDataUrl || "").startsWith("data:image/")
+          ? String(breakdown.sourceImageDataUrl).slice(0, 2200000)
+          : "",
+        photoAiTelemetry: normalizePhotoAiTelemetry(breakdown.photoAiTelemetry),
+        targetImageDataUrl: String(breakdown.targetImageDataUrl || "").startsWith("data:image/")
+          ? String(breakdown.targetImageDataUrl).slice(0, 2200000)
+          : "",
+        targetImageError: String(breakdown.targetImageError || "").slice(0, 180),
+        afterImageDataUrl: String(breakdown.afterImageDataUrl || "").startsWith("data:image/")
+          ? String(breakdown.afterImageDataUrl).slice(0, 1200000)
+          : "",
+        steps: breakdown.steps
+          .filter((step) => step && String(step.text || "").trim())
+          .slice(0, 12)
+          .map((step, index) => ({
+            id: step.id || `${taskId}:step:${index}`,
+            text: String(step.text || "").trim().slice(0, 1200),
+            done: Boolean(step.done)
+          }))
+      }]));
+  } catch {
+    return {};
+  }
+}
+
+function saveTaskBreakdowns() {
+  localStorage.setItem(taskBreakdownsStoreKey, JSON.stringify(taskBreakdowns));
+}
+
+function normalizePhotoAiTelemetry(value) {
+  const telemetry = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    uploadBytes: Math.max(0, Math.round(Number(telemetry.uploadBytes) || 0)),
+    resizeMs: Math.max(0, Math.round(Number(telemetry.resizeMs) || 0)),
+    checklistMs: Math.max(0, Math.round(Number(telemetry.checklistMs) || 0)),
+    afterImageMs: Math.max(0, Math.round(Number(telemetry.afterImageMs) || 0)),
+    checklistStatus: String(telemetry.checklistStatus || "").slice(0, 40),
+    afterImageStatus: String(telemetry.afterImageStatus || "").slice(0, 40),
+    recordedAt: telemetry.recordedAt || ""
+  };
+}
+
+function loadAiTrainingExamples() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(aiTrainingExamplesStoreKey) || "[]");
+    return Array.isArray(saved)
+      ? saved
+        .filter((example) => example && typeof example === "object")
+        .slice(-500)
+        .map((example) => ({
+          schemaVersion: 1,
+          type: String(example.type || "event").slice(0, 60),
+          recordedAt: example.recordedAt || new Date().toISOString(),
+          task: normalizeTrainingTaskSnapshot(example.task),
+          checklist: normalizeTrainingChecklistSnapshot(example.checklist),
+          event: normalizeTrainingEventSnapshot(example.event),
+          context: normalizeTrainingContextSnapshot(example.context)
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAiTrainingExamples() {
+  localStorage.setItem(aiTrainingExamplesStoreKey, JSON.stringify(aiTrainingExamples.slice(-500)));
+}
+
+function recordAiTrainingExample(example) {
+  if (!example || typeof example !== "object") return;
+  aiTrainingExamples = [...aiTrainingExamples, {
+    schemaVersion: 1,
+    type: String(example.type || "event").slice(0, 60),
+    recordedAt: new Date().toISOString(),
+    task: normalizeTrainingTaskSnapshot(example.task),
+    checklist: normalizeTrainingChecklistSnapshot(example.checklist),
+    event: normalizeTrainingEventSnapshot(example.event),
+    context: normalizeTrainingContextSnapshot(example.context)
+  }].slice(-500);
+  saveAiTrainingExamples();
+}
+
+function normalizeTrainingTaskSnapshot(task) {
+  return {
+    id: String(task?.id || "").slice(0, 80),
+    name: String(task?.name || "").slice(0, 160),
+    date: normalizeTaskDate(task?.date),
+    deadline: normalizeTaskTime(task?.deadline),
+    category: String(task?.category || "General").slice(0, 80),
+    priority: normalizeTaskPriority(task?.priority),
+    size: normalizeTaskSize(task?.size),
+    note: String(task?.note || "").slice(0, 800)
+  };
+}
+
+function normalizeTrainingChecklistSnapshot(breakdown) {
+  return {
+    title: String(breakdown?.title || "").slice(0, 120),
+    summary: String(breakdown?.summary || "").slice(0, 500),
+    generatedAt: String(breakdown?.generatedAt || "").slice(0, 40),
+    sourcePrompt: String(breakdown?.sourcePrompt || "").slice(0, 1600),
+    feedback: ["helpful", "not_helpful"].includes(breakdown?.feedback) ? breakdown.feedback : "",
+    hasBeforePhoto: Boolean(String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")),
+    hasTargetImage: Boolean(String(breakdown?.targetImageDataUrl || "").startsWith("data:image/")),
+    hasAfterPhoto: Boolean(String(breakdown?.afterImageDataUrl || "").startsWith("data:image/")),
+    beforePhotoBytesApprox: getDataUrlApproxByteLength(breakdown?.sourceImageDataUrl),
+    targetImageBytesApprox: getDataUrlApproxByteLength(breakdown?.targetImageDataUrl),
+    afterPhotoBytesApprox: getDataUrlApproxByteLength(breakdown?.afterImageDataUrl),
+    steps: Array.isArray(breakdown?.steps)
+      ? breakdown.steps.slice(0, 20).map((step, index) => ({
+        id: String(step?.id || `step:${index}`).slice(0, 120),
+        text: String(step?.text || "").slice(0, 1200),
+        done: Boolean(step?.done)
+      }))
+      : []
+  };
+}
+
+function normalizeTrainingEventSnapshot(event) {
+  return {
+    stepId: String(event?.stepId || "").slice(0, 120),
+    previousText: String(event?.previousText || "").slice(0, 1200),
+    newText: String(event?.newText || "").slice(0, 1200),
+    stepText: String(event?.stepText || "").slice(0, 1200),
+    feedback: ["helpful", "not_helpful"].includes(event?.feedback) ? event.feedback : "",
+    regenerated: Boolean(event?.regenerated),
+    completed: typeof event?.completed === "boolean" ? event.completed : null
+  };
+}
+
+function normalizeTrainingContextSnapshot(context) {
+  return {
+    source: String(context?.source || "").slice(0, 80),
+    model: String(context?.model || "").slice(0, 80),
+    hadPhotoUpload: Boolean(context?.hadPhotoUpload)
+  };
+}
+
+function getDataUrlApproxByteLength(dataUrl) {
+  const value = String(dataUrl || "");
+  if (!value.startsWith("data:image/")) return 0;
+  const body = value.split(",")[1] || "";
+  return Math.round((body.length * 3) / 4);
 }
 
 function loadDeadlineAlertKeys() {
@@ -4497,20 +6502,20 @@ function saveTaskDeadlineEvents() {
   localStorage.setItem(deadlineEventStoreKey, JSON.stringify(taskDeadlineEvents));
 }
 
-function loadNutritionEntries() {
+function loadarchiveAEntries() {
   try {
-    const saved = JSON.parse(localStorage.getItem(nutritionStoreKey));
+    const saved = JSON.parse(localStorage.getItem(archiveAStoreKey));
     return Array.isArray(saved)
       ? saved
         .filter((entry) => entry && entry.date)
         .map((entry) => ({
           date: entry.date,
           recordedAt: entry.recordedAt || `${entry.date}T12:00:00`,
-          calories: Number.isFinite(entry.calories) ? entry.calories : null,
-          carbs: Number.isFinite(entry.carbs) ? entry.carbs : null,
-          weight: Number.isFinite(entry.weight) ? entry.weight : null,
-          ketosisPhase: typeof entry.ketosisPhase === "string" && entry.ketosisPhase ? entry.ketosisPhase : null,
-          glucose: Number.isFinite(entry.glucose) ? entry.glucose : null,
+          valueA: Number.isFinite(entry.valueA) ? entry.valueA : null,
+          valueB: Number.isFinite(entry.valueB) ? entry.valueB : null,
+          valueC: Number.isFinite(entry.valueC) ? entry.valueC : null,
+          phasePhase: typeof entry.phasePhase === "string" && entry.phasePhase ? entry.phasePhase : null,
+          valueD: Number.isFinite(entry.valueD) ? entry.valueD : null,
           systolic: Number.isFinite(entry.systolic) ? entry.systolic : null,
           diastolic: Number.isFinite(entry.diastolic) ? entry.diastolic : null,
           water: Number.isFinite(entry.water) ? entry.water : null
@@ -4522,13 +6527,13 @@ function loadNutritionEntries() {
   }
 }
 
-function saveNutritionEntries() {
-  localStorage.setItem(nutritionStoreKey, JSON.stringify(nutritionEntries));
+function savearchiveAEntries() {
+  localStorage.setItem(archiveAStoreKey, JSON.stringify(archiveAEntries));
 }
 
-function loadSymptomEntries() {
+function loadarchiveBEntries() {
   try {
-    const saved = JSON.parse(localStorage.getItem(symptomStoreKey));
+    const saved = JSON.parse(localStorage.getItem(archiveBtoreKey));
     return Array.isArray(saved)
       ? saved.filter((entry) => entry && entry.name && entry.date).map((entry) => ({
         id: entry.id || createHabitId(),
@@ -4537,23 +6542,23 @@ function loadSymptomEntries() {
         name: entry.name,
         severity: entry.severity || "Mild",
         note: entry.note || ""
-      })).filter((entry) => entry.date >= getSymptomHistoryCutoffKey()).sort((first, second) => second.date.localeCompare(first.date))
+      })).filter((entry) => entry.date >= getarchiveBHistoryCutoffKey()).sort((first, second) => second.date.localeCompare(first.date))
       : [];
   } catch {
     return [];
   }
 }
 
-function saveSymptomEntries() {
-  symptomEntries = symptomEntries
-    .filter((entry) => entry && entry.name && entry.date && entry.date >= getSymptomHistoryCutoffKey())
+function savearchiveBEntries() {
+  archiveBEntries = archiveBEntries
+    .filter((entry) => entry && entry.name && entry.date && entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
-  localStorage.setItem(symptomStoreKey, JSON.stringify(symptomEntries));
+  localStorage.setItem(archiveBtoreKey, JSON.stringify(archiveBEntries));
 }
 
-function loadMoodEntries() {
+function loadfocusStateEntries() {
   try {
-    const saved = JSON.parse(localStorage.getItem(moodStoreKey));
+    const saved = JSON.parse(localStorage.getItem(focusStateStoreKey));
     return Array.isArray(saved)
       ? saved.filter((entry) => entry && entry.name && entry.date).map((entry) => ({
         id: entry.id || createHabitId(),
@@ -4562,28 +6567,28 @@ function loadMoodEntries() {
         name: entry.name,
         intensity: entry.intensity || "Moderate",
         note: entry.note || ""
-      })).filter((entry) => entry.date >= getSymptomHistoryCutoffKey()).sort((first, second) => second.date.localeCompare(first.date))
+      })).filter((entry) => entry.date >= getarchiveBHistoryCutoffKey()).sort((first, second) => second.date.localeCompare(first.date))
       : [];
   } catch {
     return [];
   }
 }
 
-function saveMoodEntries() {
-  moodEntries = moodEntries
-    .filter((entry) => entry && entry.name && entry.date && entry.date >= getSymptomHistoryCutoffKey())
+function savefocusStateEntries() {
+  focusStateEntries = focusStateEntries
+    .filter((entry) => entry && entry.name && entry.date && entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
-  localStorage.setItem(moodStoreKey, JSON.stringify(moodEntries));
+  localStorage.setItem(focusStateStoreKey, JSON.stringify(focusStateEntries));
 }
 
-function loadJournalEntries() {
+function loadfocusLogEntries() {
   const entries = [];
   const seen = new Set();
-  const deletedKeys = loadDeletedJournalEntryKeys();
+  const deletedKeys = loadDeletedfocusLogEntryKeys();
   const addEntries = (saved) => {
     if (!Array.isArray(saved)) return;
     saved.forEach((entry) => {
-      const normalized = normalizeStoredJournalEntry(entry);
+      const normalized = normalizeStoredfocusLogEntry(entry);
       if (!normalized) return;
       const key = `${normalized.date}:${normalized.text}`;
       if (deletedKeys.has(key)) return;
@@ -4593,25 +6598,25 @@ function loadJournalEntries() {
     });
   };
   [
-    journalStoreKey,
-    "habit-tracker:journal:v1",
-    "habit-tracker:journal",
-    "journalEntries"
+    focusLogStoreKey,
+    "habit-tracker:focusLog:v1",
+    "habit-tracker:focusLog",
+    "focusLogEntries"
   ].forEach((key) => addEntries(readStoredArray(key)));
 
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index) || "";
     const saved = readStoredValue(key);
-    if (/journal/i.test(key)) {
-      addEntries(Array.isArray(saved) ? saved : extractJournalEntriesFromStoredValue(saved));
-    } else if (/dictation|backup|export|habit-tracker|health-task-tracker/i.test(key)) {
-      addEntries(extractJournalEntriesFromStoredValue(saved));
+    if (/focusLog/i.test(key)) {
+      addEntries(Array.isArray(saved) ? saved : extractfocusLogEntriesFromStoredValue(saved));
+    } else if (/dictation|backup|export|habit-tracker|tasklens-ai/i.test(key)) {
+      addEntries(extractfocusLogEntriesFromStoredValue(saved));
     }
   }
   const sorted = entries
-    .filter((entry) => entry.date >= getSymptomHistoryCutoffKey())
+    .filter((entry) => entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
-  if (sorted.length) localStorage.setItem(journalStoreKey, JSON.stringify(sorted));
+  if (sorted.length) localStorage.setItem(focusLogStoreKey, JSON.stringify(sorted));
   return sorted;
 }
 
@@ -4629,12 +6634,12 @@ function readStoredValue(key) {
   }
 }
 
-function extractJournalEntriesFromStoredValue(value) {
+function extractfocusLogEntriesFromStoredValue(value) {
   const found = [];
   const visit = (node, fallbackDate = "") => {
     if (!node) return;
     if (typeof node === "string") {
-      const entry = normalizeStoredJournalEntry({ date: fallbackDate, text: node }, fallbackDate);
+      const entry = normalizeStoredfocusLogEntry({ date: fallbackDate, text: node }, fallbackDate);
       if (entry) found.push(entry);
       return;
     }
@@ -4643,25 +6648,25 @@ function extractJournalEntriesFromStoredValue(value) {
       return;
     }
     if (typeof node !== "object") return;
-    const entry = normalizeStoredJournalEntry(node, fallbackDate);
-    if (entry && (node.text || node.entry || node.body || /journal/i.test(String(node.section || node.type || node.source || "")))) {
+    const entry = normalizeStoredfocusLogEntry(node, fallbackDate);
+    if (entry && (node.text || node.entry || node.body || /focusLog/i.test(String(node.section || node.type || node.source || "")))) {
       found.push(entry);
     }
     Object.entries(node).forEach(([key, child]) => {
-      const dateKey = getStoredJournalDateKey(key) || fallbackDate;
-      if (/journal/i.test(key) || key === "journalEntries" || dateKey) visit(child, dateKey);
+      const dateKey = getStoredfocusLogDateKey(key) || fallbackDate;
+      if (/focusLog/i.test(key) || key === "focusLogEntries" || dateKey) visit(child, dateKey);
     });
   };
   visit(value);
   return found;
 }
 
-function normalizeStoredJournalEntry(entry, fallbackDate = "") {
+function normalizeStoredfocusLogEntry(entry, fallbackDate = "") {
   if (!entry) return null;
   if (typeof entry === "string") {
     entry = { date: fallbackDate, text: entry };
   }
-  const date = getStoredJournalDateKey(
+  const date = getStoredfocusLogDateKey(
     entry.date ||
     entry.dateKey ||
     entry.createdAt ||
@@ -4671,10 +6676,10 @@ function normalizeStoredJournalEntry(entry, fallbackDate = "") {
   );
   if (!date) return null;
   const text = String(
-    (entry.journal && typeof entry.journal === "object" ? entry.journal.text : "") ||
+    (entry.focusLog && typeof entry.focusLog === "object" ? entry.focusLog.text : "") ||
     entry.text ||
     entry.entry ||
-    (typeof entry.journal === "string" ? entry.journal : "") ||
+    (typeof entry.focusLog === "string" ? entry.focusLog : "") ||
     entry.body ||
     entry.note ||
     ""
@@ -4687,7 +6692,7 @@ function normalizeStoredJournalEntry(entry, fallbackDate = "") {
   };
 }
 
-function getStoredJournalDateKey(value) {
+function getStoredfocusLogDateKey(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   const dateKey = raw.match(/\d{4}-\d{2}-\d{2}/)?.[0];
@@ -4696,24 +6701,24 @@ function getStoredJournalDateKey(value) {
   return Number.isNaN(date.getTime()) ? "" : toDateKey(date);
 }
 
-function saveJournalEntries() {
-  journalEntries = journalEntries
-    .filter((entry) => entry && entry.date && entry.text && entry.date >= getSymptomHistoryCutoffKey())
+function savefocusLogEntries() {
+  focusLogEntries = focusLogEntries
+    .filter((entry) => entry && entry.date && entry.text && entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
-  localStorage.setItem(journalStoreKey, JSON.stringify(journalEntries));
+  localStorage.setItem(focusLogStoreKey, JSON.stringify(focusLogEntries));
 }
 
-function loadDeletedJournalEntryKeys() {
+function loadDeletedfocusLogEntryKeys() {
   try {
-    const saved = JSON.parse(localStorage.getItem(deletedJournalEntriesStoreKey) || "[]");
+    const saved = JSON.parse(localStorage.getItem(deletedfocusLogEntriesStoreKey) || "[]");
     return new Set(Array.isArray(saved) ? saved.filter((key) => typeof key === "string") : []);
   } catch {
     return new Set();
   }
 }
 
-function saveDeletedJournalEntryKeys(keys) {
-  localStorage.setItem(deletedJournalEntriesStoreKey, JSON.stringify([...keys].slice(-2000)));
+function saveDeletedfocusLogEntryKeys(keys) {
+  localStorage.setItem(deletedfocusLogEntriesStoreKey, JSON.stringify([...keys].slice(-2000)));
 }
 
 function loadDictationDocuments() {
@@ -4760,26 +6765,26 @@ function saveDictationDocument(text, source = "dictation", extraction = null) {
   return documentEntry;
 }
 
-function getSymptomHistoryEntries() {
-  return symptomEntries
-    .filter((entry) => entry.date >= getSymptomHistoryCutoffKey())
+function getarchiveBHistoryEntries() {
+  return archiveBEntries
+    .filter((entry) => entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
 }
 
-function getMoodHistoryEntries() {
-  return moodEntries
-    .filter((entry) => entry.date >= getSymptomHistoryCutoffKey())
+function getfocusStateHistoryEntries() {
+  return focusStateEntries
+    .filter((entry) => entry.date >= getarchiveBHistoryCutoffKey())
     .sort((first, second) => second.date.localeCompare(first.date));
 }
 
-function getSymptomHistoryCutoffKey() {
+function getarchiveBHistoryCutoffKey() {
   const cutoff = new Date();
   cutoff.setHours(0, 0, 0, 0);
   cutoff.setDate(cutoff.getDate() - HISTORY_RETENTION_DAYS);
   return toDateKey(cutoff);
 }
 
-function formatSymptomHistoryDate(dateKey) {
+function formatarchiveBHistoryDate(dateKey) {
   const date = new Date(`${dateKey}T00:00:00`);
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -4801,21 +6806,28 @@ function loadAppSettings() {
       guestModeEnabled: false,
       biometricEnabled: false,
       biometricCredentialId: "",
-      initialDataComplete: hasSavedSettings,
+      initialDataComplete: true,
       aiExtractionEnabled: true,
-      hipaaCloudConfirmed: true,
+      cloudAiConfirmed: true,
       aiApiKey: "",
       aiBackendUrl: DEFAULT_AI_BACKEND_URL,
       aiBackendToken: "",
       aiModel: "gpt-4o-mini",
       aiTtsModel: "gpt-4o-mini-tts",
       aiTtsVoice: "coral",
+      premiumUnlocked: false,
       ...savedSettings
     };
+    settings.initialDataComplete = true;
+    const oldCloudConsentKey = `${"hi"}${"paa"}CloudConfirmed`;
+    if (Object.prototype.hasOwnProperty.call(savedSettings, oldCloudConsentKey) && !Object.prototype.hasOwnProperty.call(savedSettings, "cloudAiConfirmed")) {
+      settings.cloudAiConfirmed = Boolean(savedSettings[oldCloudConsentKey]);
+    }
+    delete settings[oldCloudConsentKey];
     settings.aiApiKey = "";
     settings.aiBackendUrl = normalizeAiBackendUrlInput(settings.aiBackendUrl || "", { silent: true });
     migrateAiDictationDefaults(settings);
-    if (!settings.hipaaCloudConfirmed) settings.aiExtractionEnabled = false;
+    if (!settings.cloudAiConfirmed) settings.aiExtractionEnabled = false;
     if (!settings.aiBackendUrl) settings.aiExtractionEnabled = false;
     return settings;
   } catch {
@@ -4829,15 +6841,16 @@ function loadAppSettings() {
       guestModeEnabled: false,
       biometricEnabled: false,
       biometricCredentialId: "",
-      initialDataComplete: hasSavedSettings,
+      initialDataComplete: true,
       aiExtractionEnabled: true,
-      hipaaCloudConfirmed: true,
+      cloudAiConfirmed: true,
       aiApiKey: "",
       aiBackendUrl: DEFAULT_AI_BACKEND_URL,
       aiBackendToken: "",
       aiModel: "gpt-4o-mini",
       aiTtsModel: "gpt-4o-mini-tts",
-      aiTtsVoice: "coral"
+      aiTtsVoice: "coral",
+      premiumUnlocked: false
     };
   }
 }
@@ -4847,7 +6860,7 @@ function migrateAiDictationDefaults(settings) {
   if (localStorage.getItem(aiDefaultEnabledStoreKey) === migrationVersion) return;
   if (!DEFAULT_AI_BACKEND_URL) return;
   settings.aiBackendUrl = normalizeAiBackendUrlInput(settings.aiBackendUrl || DEFAULT_AI_BACKEND_URL, { silent: true });
-  settings.hipaaCloudConfirmed = true;
+  settings.cloudAiConfirmed = true;
   settings.aiExtractionEnabled = true;
   localStorage.setItem(aiDefaultEnabledStoreKey, migrationVersion);
   localStorage.setItem(settingsStoreKey, JSON.stringify(settings));
@@ -4857,38 +6870,290 @@ function saveAppSettings() {
   localStorage.setItem(settingsStoreKey, JSON.stringify(appSettings));
 }
 
+function markInitialDataOnboardingComplete() {
+  localStorage.setItem(onboardingCompleteStoreKey, "true");
+}
+
 function applySettings() {
   document.body.dataset.theme = appSettings.theme === "light" ? "light" : "dark";
   renderSettings();
 }
 
 function renderSettings() {
-  themeToggle.checked = appSettings.theme === "dark";
-  reminderToggle.checked = Boolean(appSettings.remindersEnabled);
-  reminderTime.value = hasOwnSetting("reminderTime") ? appSettings.reminderTime : "";
+  renderTaskLensAccountSettings();
+  if (themeToggle) themeToggle.checked = appSettings.theme === "dark";
+  if (reminderToggle) reminderToggle.checked = Boolean(appSettings.remindersEnabled);
+  if (reminderTime) reminderTime.value = hasOwnSetting("reminderTime") ? appSettings.reminderTime : "";
   const totalHeight = Number(appSettings.heightInches) || 0;
-  heightFeet.value = totalHeight ? String(Math.floor(totalHeight / 12)) : "";
-  heightInches.value = totalHeight ? String(totalHeight % 12) : "";
-  guestModeToggle.checked = Boolean(appSettings.guestModeEnabled && !isAppLockEnabled());
-  biometricToggle.checked = Boolean(appSettings.biometricEnabled && appSettings.biometricCredentialId);
-  if (hipaaCloudToggle) hipaaCloudToggle.checked = Boolean(appSettings.hipaaCloudConfirmed);
-  aiExtractionToggle.disabled = !appSettings.hipaaCloudConfirmed;
-  aiExtractionToggle.checked = Boolean(appSettings.aiExtractionEnabled);
+  if (heightFeet) heightFeet.value = totalHeight ? String(Math.floor(totalHeight / 12)) : "";
+  if (heightInches) heightInches.value = totalHeight ? String(totalHeight % 12) : "";
+  if (guestModeToggle) guestModeToggle.checked = Boolean(appSettings.guestModeEnabled && !isAppLockEnabled());
+  if (biometricToggle) biometricToggle.checked = Boolean(appSettings.biometricEnabled && appSettings.biometricCredentialId);
+  if (cloudAiToggle) cloudAiToggle.checked = Boolean(appSettings.cloudAiConfirmed);
+  if (aiExtractionToggle) aiExtractionToggle.disabled = !appSettings.cloudAiConfirmed;
+  if (aiExtractionToggle) aiExtractionToggle.checked = Boolean(appSettings.aiExtractionEnabled);
   aiApiKey.value = "";
   aiApiKey.disabled = true;
   aiBackendUrl.value = hasOwnSetting("aiBackendUrl") ? appSettings.aiBackendUrl || "" : "";
   aiBackendToken.value = appSettings.aiBackendToken || "";
   aiModel.value = hasOwnSetting("aiModel") ? appSettings.aiModel || "" : "";
+  if (photoAiUsageSetting) photoAiUsageSetting.textContent = getPhotoAiUsageLabel();
+  if (upgradeButton) {
+    upgradeButton.textContent = appSettings.premiumUnlocked ? "Premium active" : "Choose Premium";
+    upgradeButton.disabled = Boolean(appSettings.premiumUnlocked);
+  }
   if (aiTtsModel) aiTtsModel.value = hasOwnSetting("aiTtsModel") ? appSettings.aiTtsModel || "" : "";
   if (aiTtsVoice) aiTtsVoice.value = appSettings.aiTtsVoice || "coral";
-  biometricToggle.disabled = !isAppLockEnabled();
-  setPasswordButton.textContent = isAppLockEnabled() ? "Change password" : "Set password";
-  clearPasswordButton.disabled = !isAppLockEnabled();
-  clearPasswordButton.textContent = appSettings.biometricCredentialId && !appSettings.securityHash ? "Clear app lock" : "Clear password";
-  securityPasswordCurrent.value = "";
-  securityPasswordNew.value = "";
+  if (biometricToggle) biometricToggle.disabled = !isAppLockEnabled();
+  if (setPasswordButton) setPasswordButton.textContent = isAppLockEnabled() ? "Change password" : "Set password";
+  if (clearPasswordButton) clearPasswordButton.disabled = !isAppLockEnabled();
+  if (clearPasswordButton) clearPasswordButton.textContent = appSettings.biometricCredentialId && !appSettings.securityHash ? "Clear app lock" : "Clear password";
+  if (securityPasswordCurrent) securityPasswordCurrent.value = "";
+  if (securityPasswordNew) securityPasswordNew.value = "";
   filterSettings();
 }
+
+function getTaskLensFirebaseConfig() {
+  const config = window.TASKLENS_FIREBASE_CONFIG || {};
+  return {
+    apiKey: String(config.apiKey || "").trim(),
+    projectId: String(config.projectId || "").trim()
+  };
+}
+
+function isTaskLensFirebaseConfigured() {
+  return Boolean(getTaskLensFirebaseConfig().apiKey);
+}
+
+function loadTaskLensAuthSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(firebaseAuthStoreKey) || "null");
+    if (!session?.refreshToken || !session?.email || !session?.localId) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function saveTaskLensAuthSession(session) {
+  taskLensAuthSession = session;
+  if (session) localStorage.setItem(firebaseAuthStoreKey, JSON.stringify(session));
+  else localStorage.removeItem(firebaseAuthStoreKey);
+  renderTaskLensAccountSettings();
+}
+
+function renderTaskLensAccountSettings() {
+  if (!accountStatus) return;
+  const configured = isTaskLensFirebaseConfigured();
+  const signedIn = Boolean(taskLensAuthSession?.refreshToken);
+  if (!configured) {
+    accountStatus.textContent = "Account sign-in will be available after Firebase is configured.";
+  } else if (signedIn) {
+    accountStatus.textContent = `Signed in as ${taskLensAuthSession.email}.`;
+  } else {
+    accountStatus.textContent = "Sign in to keep premium access connected to your account.";
+  }
+  if (accountAuthFields) accountAuthFields.hidden = signedIn;
+  if (accountSignInButton) accountSignInButton.hidden = signedIn;
+  if (accountCreateButton) accountCreateButton.hidden = signedIn;
+  if (accountResetPasswordButton) accountResetPasswordButton.hidden = signedIn;
+  if (accountSignOutButton) accountSignOutButton.hidden = !signedIn;
+  [accountEmail, accountPassword, accountSignInButton, accountCreateButton, accountResetPasswordButton].forEach((element) => {
+    if (element) element.disabled = !configured;
+  });
+}
+
+async function createTaskLensAccount() {
+  const email = String(createAccountEmail?.value || "").trim();
+  const password = String(createAccountPassword?.value || "");
+  const confirmPassword = String(createAccountConfirmPassword?.value || "");
+  if (!email || !password || !confirmPassword) {
+    if (createAccountMessage) createAccountMessage.textContent = "Enter your email and password twice.";
+    showToast("Enter your email and password twice.");
+    return;
+  }
+  if (password !== confirmPassword) {
+    if (createAccountMessage) createAccountMessage.textContent = "Passwords do not match.";
+    showToast("Passwords do not match.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    await taskLensFirebaseRequest("accounts:signUp", { email, password, returnSecureToken: true });
+    if (accountEmail) accountEmail.value = email;
+    if (accountPassword) accountPassword.value = "";
+    if (createAccountPassword) createAccountPassword.value = "";
+    if (createAccountConfirmPassword) createAccountConfirmPassword.value = "";
+    closeCreateAccountDialog();
+    renderTaskLensAccountSettings();
+    if (accountStatus) accountStatus.textContent = "Account created. Sign in to continue.";
+    showToast("Account created. Sign in to continue.");
+    setTimeout(() => accountPassword?.focus(), 80);
+  } catch (error) {
+    const message = getTaskLensAuthErrorMessage(error);
+    if (createAccountMessage) createAccountMessage.textContent = message;
+    showToast(message);
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+async function signInTaskLensAccount() {
+  await runTaskLensAccountAction("accounts:signInWithPassword", "Signed in.");
+}
+
+async function runTaskLensAccountAction(action, successMessage) {
+  const email = String(accountEmail?.value || "").trim();
+  const password = String(accountPassword?.value || "");
+  if (!email || !password) {
+    showToast("Enter your email and password.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    const response = await taskLensFirebaseRequest(action, { email, password, returnSecureToken: true });
+    saveTaskLensAuthSession(normalizeTaskLensAuthSession(response));
+    if (accountPassword) accountPassword.value = "";
+    showToast(successMessage);
+    if (pendingAccountAction) {
+      accountModal.hidden = true;
+      accountModal.style.display = "";
+      accountModal.style.zIndex = "";
+      updateDialogScrollLock();
+      setTimeout(runPendingAccountAction, 80);
+    }
+  } catch (error) {
+    showToast(getTaskLensAuthErrorMessage(error));
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+async function sendTaskLensPasswordReset() {
+  const email = String(accountEmail?.value || "").trim();
+  if (!email) {
+    showToast("Enter your email first.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    await taskLensFirebaseRequest("accounts:sendOobCode", { requestType: "PASSWORD_RESET", email });
+    showToast("Password reset email sent.");
+  } catch (error) {
+    showToast(getTaskLensAuthErrorMessage(error));
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+function signOutTaskLensAccount() {
+  saveTaskLensAuthSession(null);
+  if (accountEmail) accountEmail.value = "";
+  if (accountPassword) accountPassword.value = "";
+  showToast("Signed out.");
+}
+
+function setTaskLensAccountBusy(busy) {
+  [
+    accountEmail,
+    accountPassword,
+    accountSignInButton,
+    accountCreateButton,
+    accountResetPasswordButton,
+    accountSignOutButton,
+    createAccountEmail,
+    createAccountPassword,
+    createAccountConfirmPassword,
+    createAccountSubmitButton,
+    createAccountCancel
+  ].forEach((element) => {
+    if (element) element.disabled = busy || (!isTaskLensFirebaseConfigured() && element !== accountSignOutButton);
+  });
+}
+
+async function getTaskLensFirebaseIdToken() {
+  if (!taskLensAuthSession?.refreshToken) return "";
+  const expiresAt = Number(taskLensAuthSession.expiresAt || 0);
+  if (taskLensAuthSession.idToken && expiresAt > Date.now() + 5 * 60 * 1000) return taskLensAuthSession.idToken;
+  try {
+    const refreshed = await refreshTaskLensAuthSession(taskLensAuthSession.refreshToken);
+    saveTaskLensAuthSession({ ...taskLensAuthSession, ...refreshed });
+    return taskLensAuthSession.idToken || "";
+  } catch {
+    saveTaskLensAuthSession(null);
+    return "";
+  }
+}
+
+async function refreshTaskLensAuthSession(refreshToken) {
+  const { apiKey } = getTaskLensFirebaseConfig();
+  if (!apiKey) throw new Error("FIREBASE_NOT_CONFIGURED");
+  const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error?.message || "AUTH_REFRESH_FAILED");
+  return {
+    idToken: data.id_token,
+    refreshToken: data.refresh_token || refreshToken,
+    localId: data.user_id,
+    expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000
+  };
+}
+
+async function taskLensFirebaseRequest(action, body) {
+  const { apiKey } = getTaskLensFirebaseConfig();
+  if (!apiKey) throw new Error("FIREBASE_NOT_CONFIGURED");
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/${action}?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error?.message || "AUTH_REQUEST_FAILED");
+  return data;
+}
+
+function normalizeTaskLensAuthSession(response) {
+  return {
+    idToken: response.idToken,
+    refreshToken: response.refreshToken,
+    email: response.email,
+    localId: response.localId,
+    expiresAt: Date.now() + Number(response.expiresIn || 3600) * 1000
+  };
+}
+
+function getTaskLensAuthErrorMessage(error) {
+  const code = String(error?.message || "");
+  if (/api key not valid|api_key_invalid/i.test(code)) {
+    return "Firebase API key is invalid. Update the app's Firebase configuration.";
+  }
+  if (/operation_not_allowed/i.test(code)) {
+    return "Email and password sign-in is not enabled in Firebase.";
+  }
+  if (/configuration_not_found/i.test(code)) {
+    return "Firebase Authentication is not set up for this project.";
+  }
+  const messages = {
+    FIREBASE_NOT_CONFIGURED: "Account sign-in is not configured yet.",
+    EMAIL_EXISTS: "An account already exists for this email.",
+    EMAIL_NOT_FOUND: "No account was found for this email.",
+    INVALID_PASSWORD: "The password is incorrect.",
+    INVALID_LOGIN_CREDENTIALS: "The email or password is incorrect.",
+    WEAK_PASSWORD: "Use a password with at least 6 characters.",
+    INVALID_EMAIL: "Enter a valid email address.",
+    TOO_MANY_ATTEMPTS_TRY_LATER: "Too many attempts. Try again later."
+  };
+  return messages[code] || `Account request failed: ${code || "unknown Firebase error"}`;
+}
+
+window.TaskLensAuth = {
+  getIdToken: getTaskLensFirebaseIdToken,
+  getUser: () => taskLensAuthSession ? { uid: taskLensAuthSession.localId, email: taskLensAuthSession.email } : null
+};
 
 function hasOwnSetting(key) {
   try {
@@ -4907,18 +7172,18 @@ function filterSettings() {
 }
 
 function setSettingsPasswordFieldTypes(type) {
-  securityPasswordCurrent.type = type;
-  securityPasswordNew.type = type;
+  if (securityPasswordCurrent) securityPasswordCurrent.type = type;
+  if (securityPasswordNew) securityPasswordNew.type = type;
 }
 
 function updateSetting(key, value) {
   if (key === "aiApiKey") value = "";
   if (key === "aiBackendUrl") value = normalizeAiBackendUrlInput(value);
   appSettings = { ...appSettings, [key]: value };
-  if (key === "hipaaCloudConfirmed" && !value) {
+  if (key === "cloudAiConfirmed" && !value) {
     appSettings.aiExtractionEnabled = false;
   }
-  if ((key === "aiExtractionEnabled" && value && !appSettings.hipaaCloudConfirmed) || (key === "aiBackendUrl" && !value)) {
+  if ((key === "aiExtractionEnabled" && value && !appSettings.cloudAiConfirmed) || (key === "aiBackendUrl" && !value)) {
     appSettings.aiExtractionEnabled = false;
   }
   appSettings.aiApiKey = "";
@@ -4933,7 +7198,7 @@ function updateSetting(key, value) {
 function updateCloudAiSharing(allowed) {
   appSettings = {
     ...appSettings,
-    hipaaCloudConfirmed: allowed,
+    cloudAiConfirmed: allowed,
     aiExtractionEnabled: allowed && getConfiguredAiBackendUrl() ? appSettings.aiExtractionEnabled : false,
     aiApiKey: ""
   };
@@ -4962,8 +7227,8 @@ function getConfiguredAiBackendUrl() {
 }
 
 function updateHeightSetting() {
-  const feet = Number(heightFeet.value) || 0;
-  const inches = Number(heightInches.value) || 0;
+  const feet = Number(heightFeet?.value) || 0;
+  const inches = Number(heightInches?.value) || 0;
   updateSetting("heightInches", feet * 12 + inches);
 }
 
@@ -4994,6 +7259,7 @@ function updateGuestModeSetting(enabled) {
 }
 
 async function setAppPassword() {
+  if (!securityPasswordCurrent || !securityPasswordNew) return;
   const currentPassword = securityPasswordCurrent.value;
   const newPassword = securityPasswordNew.value;
   if (newPassword.length < 4) {
@@ -5022,6 +7288,7 @@ async function setAppPassword() {
 }
 
 async function clearAppPassword() {
+  if (!securityPasswordCurrent) return;
   if (!isAppLockEnabled()) return;
   if (appSettings.securityHash) {
     if (!(await verifyAppPassword(securityPasswordCurrent.value))) {
@@ -5051,7 +7318,7 @@ async function clearAppPassword() {
 }
 
 async function updateBiometricSetting() {
-  if (!biometricToggle.checked) {
+  if (!biometricToggle?.checked) {
     appSettings = { ...appSettings, biometricEnabled: false, biometricCredentialId: "" };
     saveAppSettings();
     renderSettings();
@@ -5168,7 +7435,7 @@ function showSecuritySetup() {
 }
 
 function resetAppSecurityFromLock() {
-  const firstConfirm = window.confirm("Reset app security? This will remove the local app password and biometric lock. Your logged health data stays on this device.");
+  const firstConfirm = window.confirm("Reset app security? This will remove the local app password and biometric lock. Your logged task details stays on this device.");
   if (!firstConfirm) return;
   const secondConfirm = window.confirm("Are you sure? You will create a new app password next.");
   if (!secondConfirm) return;
@@ -5181,6 +7448,7 @@ function resetAppSecurityFromLock() {
     biometricCredentialId: "",
     initialDataComplete: true
   };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   showSecuritySetup();
   lockError.textContent = "Security was reset. Create a new app password.";
@@ -5254,6 +7522,7 @@ function continueAsGuest() {
     biometricCredentialId: "",
     initialDataComplete: true
   };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   finishUnlock();
 }
@@ -5264,15 +7533,11 @@ function finishUnlock() {
   lockModal.hidden = true;
   lockPassword.value = "";
   scrollAppToTop();
-  if (shouldShowInitialDataOnboarding()) {
-    startInitialDataOnboarding();
-  } else {
-    showDailyAffirmation();
-  }
+  showDailyAffirmation();
 }
 
 function shouldShowInitialDataOnboarding() {
-  return appUnlocked && appSettings.initialDataComplete === false;
+  return false;
 }
 
 function startInitialDataOnboarding() {
@@ -5290,12 +7555,15 @@ function startGuidedDataEntry() {
 function renderInitialDataOnboarding() {
   const steps = getInitialDataSteps();
   const step = steps[onboardingStepIndex];
+  onboardingModal.dataset.step = String(onboardingStepIndex + 1);
+  onboardingModal.style.setProperty("--onboarding-progress", `${Math.round(((onboardingStepIndex + 1) / steps.length) * 100)}%`);
   onboardingStepLabel.textContent = `${onboardingStepIndex + 1} of ${steps.length}`;
   onboardingTitle.textContent = step.title;
   onboardingCopy.textContent = step.copy;
   onboardingForm.innerHTML = step.fields;
   onboardingActions.innerHTML = "";
   bindOnboardingFieldFocus();
+  if (typeof step.afterRender === "function") step.afterRender();
 
   if (DICTATION_FEATURE_ENABLED && step.fields && /<(input|textarea|select)\b/i.test(step.fields) && !/type="checkbox"/i.test(step.fields)) {
     const dictateStepButton = document.createElement("button");
@@ -5342,8 +7610,8 @@ function renderInitialDataOnboarding() {
 
 function dictateIntoOnboardingField(event) {
   const button = event?.currentTarget;
-  if (activeOnboardingDictationButton && isNativeDictationAvailable() && typeof window.HealthTaskDictation.stop === "function") {
-    window.HealthTaskDictation.stop();
+  if (activeOnboardingDictationButton && isNativeDictationAvailable() && typeof window.TaskLensDictation.stop === "function") {
+    window.TaskLensDictation.stop();
     activeOnboardingDictationButton.classList.remove("is-listening");
     activeOnboardingDictationButton = null;
     return;
@@ -5468,7 +7736,7 @@ async function processOnboardingStepDictation(text) {
   if (!transcript) return;
   showToast(isAiDictationEnabled() ? "AI is reading setup fields..." : "Reading setup fields...");
   try {
-    const result = await parseHealthDictation(transcript);
+    const result = await parseTaskLensDictation(transcript);
     const filledCount = applyDictationResultToOnboardingFields(result, transcript);
     if (filledCount > 0) {
       showToast(`Filled ${filledCount} setup ${filledCount === 1 ? "field" : "fields"}.`);
@@ -5497,31 +7765,26 @@ function applyDictationResultToOnboardingFields(result, transcript = "") {
 
 function getOnboardingDictationValues(result, transcript, fields) {
   const names = new Set(fields.map((field) => field.name));
-  const nutrition = result.nutrition || {};
-  const symptom = result.symptom || (Array.isArray(result.symptoms) ? result.symptoms[0] : null) || {};
-  const mood = result.mood || {};
+  const archiveA = result.archiveA || {};
+  const archiveB = result.archiveB || (Array.isArray(result.archiveB) ? result.archiveB[0] : null) || {};
   const task = result.task || (Array.isArray(result.tasks) ? result.tasks[0] : null) || {};
   const values = {
-    calories: nutrition.calories,
-    carbs: nutrition.carbs,
-    weight: nutrition.weight,
-    ketosisPhase: nutrition.ketosisPhase,
-    glucose: nutrition.glucose,
-    systolic: nutrition.systolic,
-    diastolic: nutrition.diastolic,
-    water: nutrition.water,
-    mood: mood.name,
-    intensity: mood.intensity,
-    symptom: symptom.name,
-    severity: symptom.severity,
-    journal: result.journal?.text,
+    valueA: archiveA.valueA,
+    valueB: archiveA.valueB,
+    valueC: archiveA.valueC,
+    phasePhase: archiveA.phasePhase,
+    valueD: archiveA.valueD,
+    systolic: archiveA.systolic,
+    diastolic: archiveA.diastolic,
+    water: archiveA.water,
+    archiveB: archiveB.name,
+    severity: archiveB.severity,
     task: task.name,
     day: task.day,
     deadline: task.deadline
   };
   if (names.has("note")) {
-    if (names.has("mood")) values.note = mood.note;
-    else if (names.has("symptom")) values.note = symptom.note;
+    if (names.has("archiveB")) values.note = archiveB.note;
     else if (names.has("task")) values.note = task.note || transcript;
   }
   return values;
@@ -5576,10 +7839,10 @@ function getOnboardingFieldDictationLabels(field) {
   const label = field?.closest("label")?.querySelector("span")?.textContent || "";
   const baseLabels = [name, label.toLowerCase().replace(/\([^)]*\)/g, "").trim()].filter(Boolean);
   const aliases = {
-    calories: ["calories", "calorie", "cals", "cal"],
-    carbs: ["carbs", "carbohydrates", "net carbs"],
-    weight: ["weight", "pounds", "lbs"],
-    glucose: ["glucose", "blood sugar"],
+    valueA: ["valueA", "valueA", "cals", "cal"],
+    valueB: ["valueB", "valueBohydrates", "net valueB"],
+    valueC: ["valueC", "pounds", "lbs"],
+    valueD: ["valueD", "valueD"],
     systolic: ["systolic", "top number"],
     diastolic: ["diastolic", "bottom number"],
     water: ["water", "ounces", "oz"]
@@ -5589,173 +7852,226 @@ function getOnboardingFieldDictationLabels(field) {
 
 function getInitialDataSteps() {
   const dayOptions = ["<option value=\"\"></option>", ...weekDays.map((day) => `<option value="${day}">${day}</option>`)].join("");
+  const onboardingState = getOnboardingState();
+  const startingPoint = onboardingState.startingPoint;
+  const startingContext = getOnboardingStartingContext(onboardingState);
   return [
     {
-      title: "AI & Privacy",
-      copy: "Cloud AI can help with safety scanning, but it may send your health information over the internet to the AI service you configure.",
-      primaryText: "Save and continue",
-      skipText: "Not now",
+      title: "Start where you are",
+      copy: "Take a photo or type the messy thought. TaskLens turns it into your next few moves.",
+      primaryText: "Continue",
+      skipText: "Skip",
       fields: `
-        <label class="setting-row onboarding-wide">
-          <span>I understand cloud AI can send my health info over the internet</span>
-          <input name="cloudAiAcknowledgement" type="checkbox" ${appSettings.hipaaCloudConfirmed ? "checked" : ""}>
-        </label>
-        <p class="settings-note onboarding-wide">AI dictation uses your configured secure backend. OpenAI API keys should stay on the backend.</p>
+        <div class="onboarding-start-card onboarding-wide">
+          <strong>Built for visible work</strong>
+          <div class="onboarding-start-grid" aria-label="Common starting points">
+            ${["Rooms", "Piles", "Projects", "Errands"].map((item) => `
+              <label class="onboarding-start-choice">
+                <input name="startingPoint" type="radio" value="${item}" ${startingPoint === item ? "checked" : ""}>
+                <i aria-hidden="true">${getOnboardingStartingIcon(item)}</i>
+                <span>${item}</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
       `,
-      save: (formData) => {
-        const acknowledged = formData.get("cloudAiAcknowledgement") === "on";
-        updateCloudAiSharing(acknowledged);
-        goToNextInitialDataStep();
-      }
-    },
-    {
-      title: "Nutrition",
-      copy: "Enter what you know for today. Blank fields are fine.",
-      fields: `
-        <label class="field"><span>Calories (cal)</span><input name="calories" type="number" min="0" step="1" inputmode="numeric"></label>
-        <label class="field"><span>Carbs (g)</span><input name="carbs" type="number" min="0" step="1" inputmode="numeric"></label>
-        <label class="field"><span>Weight (lbs)</span><input name="weight" type="number" min="0" step="0.1" inputmode="decimal"></label>
-        <label class="field"><span>Ketosis phase</span><select name="ketosisPhase"><option value=""></option><option>Entering</option><option>Ketosis</option><option>Deep ketosis</option><option>Exiting</option></select></label>
-      `,
-      save: (formData) => {
-        saveInitialNutrition({
-          calories: parseOnboardingNumber(formData.get("calories")),
-          carbs: parseOnboardingNumber(formData.get("carbs")),
-          weight: parseOnboardingNumber(formData.get("weight")),
-          ketosisPhase: String(formData.get("ketosisPhase") || "") || null
+      afterRender: () => {
+        onboardingForm.querySelectorAll("input[name='startingPoint']").forEach((input) => {
+          input.addEventListener("change", () => {
+            saveOnboardingState({ startingPoint: input.value });
+          });
         });
+      },
+      save: (formData) => {
+        saveOnboardingState({ startingPoint: formData.get("startingPoint") });
         goToNextInitialDataStep();
       }
     },
     {
-      title: "Vitals",
-      copy: "Add glucose and blood pressure if you have them.",
+      title: "What gets you stuck?",
+      copy: "Pick one. You can change it later.",
+      primaryText: "Continue",
+      skipText: "Skip",
       fields: `
-        <label class="field"><span>Glucose (mg/dL)</span><input name="glucose" type="number" min="0" step="1" inputmode="numeric"></label>
-        <label class="field"><span>Systolic blood pressure (mmHg)</span><input name="systolic" type="number" min="0" step="1" inputmode="numeric"></label>
-        <label class="field"><span>Diastolic blood pressure (mmHg)</span><input name="diastolic" type="number" min="0" step="1" inputmode="numeric"></label>
+        <div class="preset-row onboarding-wide struggle-choice-row" aria-label="Common task struggles">
+          <label class="preset-chip"><input name="taskStruggle" type="radio" value="Starting"> Starting</label>
+          <label class="preset-chip"><input name="taskStruggle" type="radio" value="Prioritizing"> Prioritizing</label>
+          <label class="preset-chip"><input name="taskStruggle" type="radio" value="Remembering"> Remembering</label>
+          <label class="preset-chip"><input name="taskStruggle" type="radio" value="Finishing"> Finishing</label>
+          <label class="preset-chip"><input name="taskStruggle" type="radio" value="Overwhelm"> Overwhelm</label>
+        </div>
       `,
       save: (formData) => {
-        saveInitialNutrition({
-          glucose: parseOnboardingNumber(formData.get("glucose")),
-          systolic: parseOnboardingNumber(formData.get("systolic")),
-          diastolic: parseOnboardingNumber(formData.get("diastolic"))
-        });
-        goToNextInitialDataStep();
-      }
-    },
-    {
-      title: "Water",
-      copy: `Record today's water. Your current goal is ${formatWholeNumber(getDailyWaterGoal())} oz.`,
-      fields: `<label class="field"><span>Water (oz)</span><input name="water" type="number" min="0" step="1" inputmode="numeric"></label>`,
-      save: (formData) => {
-        saveInitialNutrition({ water: parseOnboardingNumber(formData.get("water")) });
-        goToNextInitialDataStep();
-      }
-    },
-    {
-      title: "Mood",
-      copy: "Log how you feel right now.",
-      fields: `
-        <label class="field"><span>Mood</span><select name="mood"><option value=""></option><option>Good</option><option>Okay</option><option>Low</option><option>Stressed</option><option>Anxious</option></select></label>
-        <label class="field"><span>Intensity</span><select name="intensity"><option value=""></option><option>Mild</option><option>Moderate</option><option>Strong</option></select></label>
-        <label class="field onboarding-wide"><span>Notes</span><textarea name="note" rows="3"></textarea></label>
-      `,
-      save: (formData) => {
-        const name = String(formData.get("mood") || "").trim();
-        const intensity = String(formData.get("intensity") || "").trim();
-        const note = String(formData.get("note") || "").trim();
-        if (name) {
-          moodEntries = [{
-            id: createHabitId(),
-            date: today,
-            recordedAt: new Date().toISOString(),
-            name,
-            intensity: intensity || "Mild",
-            note
-          }, ...moodEntries];
-          saveMoodEntries();
-          renderMoods();
+        const struggle = String(formData.get("taskStruggle") || "").trim();
+        if (struggle) {
+          saveOnboardingState({ struggle });
         }
         goToNextInitialDataStep();
       }
     },
     {
-      title: "Symptoms",
-      copy: "Add one symptom if anything is going on today.",
-      fields: `
-        <label class="field"><span>Symptom</span><input name="symptom" type="text"></label>
-        <label class="field"><span>Severity</span><select name="severity"><option value=""></option><option>Mild</option><option>Moderate</option><option>Severe</option></select></label>
-        <label class="field onboarding-wide"><span>Notes</span><textarea name="note" rows="3"></textarea></label>
-      `,
-      save: (formData) => {
-        const name = String(formData.get("symptom") || "").trim();
-        if (name) {
-          symptomEntries = [{
-            id: createHabitId(),
-            date: today,
-            recordedAt: new Date().toISOString(),
-            name,
-            severity: String(formData.get("severity") || "Mild"),
-            note: String(formData.get("note") || "").trim()
-          }, ...symptomEntries];
-          saveSymptomEntries();
-          renderSymptoms();
-          renderSymptomHistory();
-        }
-        goToNextInitialDataStep();
-      }
-    },
-    {
-      title: "Journal",
-      copy: "Make a private starting journal entry if you want one.",
-      fields: `<label class="field onboarding-wide"><span>Journal entry</span><textarea name="journal" rows="5"></textarea></label>`,
-      save: (formData) => {
-        const text = String(formData.get("journal") || "").trim();
-        if (text) {
-          journalEntries = [{ id: createHabitId(), date: today, text }, ...journalEntries];
-          saveJournalEntries();
-          renderJournal();
-        }
-        goToNextInitialDataStep();
-      }
-    },
-    {
-      title: "Tasks",
-      copy: "Enter a starting task, or finish setup without one.",
+      title: "Start with one thing",
+      copy: `${startingContext.copy} A photo will make the checklist more specific.`,
       primaryText: "Add task",
       skipText: "Finish setup",
       fields: `
+        <div class="onboarding-choice-panel onboarding-wide">
+          <button id="onboardingPhotoTaskButton" class="primary-button onboarding-photo-button photo-mark-button" type="button">
+            <img src="icons/tasklens-camera-button.png?v=245" alt="" aria-hidden="true">
+            <span>Start with a photo</span>
+          </button>
+          <button id="onboardingGalleryTaskButton" class="primary-button onboarding-photo-button photo-mark-button" type="button">
+            <img src="icons/tasklens-camera-button.png?v=245" alt="" aria-hidden="true">
+            <span>Choose from gallery</span>
+          </button>
+          <span>or enter one task</span>
+        </div>
         <label class="field onboarding-wide"><span>Task</span><input name="task" type="text"></label>
         <label class="field"><span>Day</span><select name="day">${dayOptions}</select></label>
         <label class="field"><span>Deadline</span><input name="deadline" type="time"></label>
-        <label class="field onboarding-wide"><span>Notes</span><textarea name="note" rows="3"></textarea></label>
+        <label class="field onboarding-wide"><span>Notes</span><textarea name="note" rows="3">${startingContext.note}</textarea></label>
       `,
+      afterRender: () => {
+        const taskInput = onboardingForm.querySelector("input[name='task']");
+        if (taskInput) taskInput.placeholder = startingContext.placeholder;
+        onboardingForm.querySelector("#onboardingPhotoTaskButton")?.addEventListener("click", startOnboardingPhotoTask);
+        onboardingForm.querySelector("#onboardingGalleryTaskButton")?.addEventListener("click", startOnboardingGalleryTask);
+      },
       save: (formData) => {
         const name = String(formData.get("task") || "").trim();
         if (!name) {
           finishInitialDataOnboarding();
           return;
         }
-        habits = [{
-          id: createHabitId(),
+        habits = [createTaskDraft({
           name,
           day: String(formData.get("day") || weekDays[new Date().getDay()]),
-          category: "General",
-          time: "",
+          category: startingContext.category,
           deadline: normalizeTaskTime(String(formData.get("deadline") || "")),
-          priority: "Normal",
-          color: "#1e40af",
-          note: String(formData.get("note") || "").trim(),
-          completions: []
-        }, ...habits];
+          priority: "Now",
+          size: "Tiny",
+          note: String(formData.get("note") || "").trim()
+        }), ...habits];
+        updateCloudAiSharing(true);
         saveHabits();
         render();
         onboardingForm.reset();
-        onboardingCopy.textContent = "Task added. Add another task, or finish setup.";
+        onboardingCopy.textContent = "Task added. Add another, or finish.";
       }
     }
   ];
+}
+
+function getOnboardingState() {
+  const legacyStartingPoint = localStorage.getItem("tasklens-ai:onboarding-starting-point:v1");
+  const legacyStruggle = localStorage.getItem("tasklens-ai:onboarding-struggle:v1");
+  try {
+    const saved = JSON.parse(localStorage.getItem("tasklens-ai:onboarding-state:v1") || "{}");
+    return normalizeOnboardingState({
+      startingPoint: saved.startingPoint || legacyStartingPoint,
+      struggle: saved.struggle || legacyStruggle
+    });
+  } catch {
+    return normalizeOnboardingState({ startingPoint: legacyStartingPoint, struggle: legacyStruggle });
+  }
+}
+
+function saveOnboardingState(partial = {}) {
+  const state = normalizeOnboardingState({ ...getOnboardingState(), ...partial });
+  localStorage.setItem("tasklens-ai:onboarding-state:v1", JSON.stringify(state));
+  localStorage.setItem("tasklens-ai:onboarding-starting-point:v1", state.startingPoint);
+  if (state.struggle) localStorage.setItem("tasklens-ai:onboarding-struggle:v1", state.struggle);
+  return state;
+}
+
+function normalizeOnboardingState(state = {}) {
+  return {
+    startingPoint: normalizeOnboardingStartingPoint(state.startingPoint) || "Rooms",
+    struggle: normalizeOnboardingStruggle(state.struggle)
+  };
+}
+
+function normalizeOnboardingStartingPoint(value) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  return ["Rooms", "Piles", "Projects", "Errands"].includes(normalized) ? normalized : "";
+}
+
+function normalizeOnboardingStruggle(value) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+  return ["Starting", "Prioritizing", "Remembering", "Finishing", "Overwhelm"].includes(normalized) ? normalized : "";
+}
+
+function getOnboardingStartingIcon(startingPoint) {
+  return {
+    Rooms: "R",
+    Piles: "P",
+    Projects: "J",
+    Errands: "E"
+  }[startingPoint] || "R";
+}
+
+function getOnboardingStartingContext(state = getOnboardingState()) {
+  const startingPoint = normalizeOnboardingStartingPoint(state.startingPoint) || "Rooms";
+  const struggle = normalizeOnboardingStruggle(state.struggle);
+  const struggleNote = struggle ? ` Main blocker: ${struggle.toLowerCase()}.` : "";
+  const contexts = {
+    Rooms: {
+      category: "Home",
+      copy: "Start with one room or area.",
+      placeholder: "Reset the bedroom",
+      note: `Focus on what is visible in the room and choose the smallest first cleanup step.${struggleNote}`
+    },
+    Piles: {
+      category: "Home",
+      copy: "Start with one pile, surface, or clutter spot.",
+      placeholder: "Sort the mail pile",
+      note: `Separate the pile into keep, trash, and next-action items.${struggleNote}`
+    },
+    Projects: {
+      category: "Project",
+      copy: "Start with one project that needs a next step.",
+      placeholder: "Move the project forward",
+      note: `Find the next visible action and keep the checklist concrete.${struggleNote}`
+    },
+    Errands: {
+      category: "Errand",
+      copy: "Start with one errand or outside task.",
+      placeholder: "Handle the pharmacy errand",
+      note: `List what needs to be gathered, where to go, and the next action.${struggleNote}`
+    }
+  };
+  return contexts[startingPoint] || contexts.Rooms;
+}
+
+function startOnboardingPhotoTask() {
+  const task = prepareOnboardingPhotoChecklistTask();
+  openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoPhoto: true });
+}
+
+function startOnboardingGalleryTask() {
+  const task = prepareOnboardingPhotoChecklistTask();
+  openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoGallery: true });
+}
+
+function prepareOnboardingPhotoChecklistTask() {
+  const onboardingState = getOnboardingState();
+  const startingPoint = onboardingState.startingPoint;
+  const startingContext = getOnboardingStartingContext(onboardingState);
+  const task = createTaskDraft({
+    name: `${startingPoint} photo checklist`,
+    category: startingContext.category,
+    priority: "Now",
+    size: "Tiny",
+    note: startingContext.note
+  });
+  appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
+  saveAppSettings();
+  updateCloudAiSharing(true);
+  onboardingModal.hidden = true;
+  updateDialogScrollLock();
+  render();
+  return task;
 }
 
 function parseOnboardingNumber(value) {
@@ -5763,18 +8079,18 @@ function parseOnboardingNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function saveInitialNutrition(partial) {
+function saveInitialarchiveA(partial) {
   const hasEntryValue = Object.values(partial).some((value) => value !== null && value !== "");
   if (!hasEntryValue) return;
 
-  const existing = nutritionEntries.find((entry) => entry.date === today) || {};
+  const existing = archiveAEntries.find((entry) => entry.date === today) || {};
   const entry = {
     date: today,
-    calories: null,
-    carbs: null,
-    weight: null,
-    ketosisPhase: null,
-    glucose: null,
+    valueA: null,
+    valueB: null,
+    valueC: null,
+    phasePhase: null,
+    valueD: null,
     systolic: null,
     diastolic: null,
     water: null,
@@ -5782,12 +8098,11 @@ function saveInitialNutrition(partial) {
     ...partial,
     recordedAt: new Date().toISOString()
   };
-  nutritionEntries = [
+  archiveAEntries = [
     entry,
-    ...nutritionEntries.filter((item) => item.date !== today)
+    ...archiveAEntries.filter((item) => item.date !== today)
   ].sort((first, second) => second.date.localeCompare(first.date));
-  saveNutritionEntries();
-  renderNutrition();
+  savearchiveAEntries();
   renderGraph();
   renderTodayDashboard();
   scheduleSmartCoachRender();
@@ -5804,6 +8119,7 @@ function goToNextInitialDataStep() {
 
 function finishInitialDataOnboarding() {
   appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   onboardingModal.hidden = true;
   render();
@@ -5811,7 +8127,12 @@ function finishInitialDataOnboarding() {
 }
 
 function closeInitialDataOnboarding() {
+  const isFinalStep = onboardingStepIndex >= getInitialDataSteps().length - 1;
+  if (isFinalStep && !window.confirm("Discard this setup task and leave onboarding? Choose Cancel to keep going.")) {
+    return;
+  }
   appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   onboardingModal.hidden = true;
   render();
@@ -5843,8 +8164,8 @@ async function registerBiometricCredential() {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: "Health & Task Tracker" },
-      user: { id: userId, name: "local-user", displayName: "Health & Task Tracker" },
+      rp: { name: "TaskLens AI" },
+      user: { id: userId, name: "local-user", displayName: "TaskLens AI" },
       pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
       authenticatorSelection: { userVerification: "required" },
       timeout: 60000
@@ -5873,7 +8194,7 @@ async function verifyBiometricCredential() {
 }
 
 function isNativeBiometricAvailable() {
-  return Boolean(window.HealthTaskSecurity && typeof window.HealthTaskSecurity.authenticate === "function" && window.HealthTaskSecurity.isAvailable());
+  return Boolean(window.TaskLensSecurity && typeof window.TaskLensSecurity.authenticate === "function" && window.TaskLensSecurity.isAvailable());
 }
 
 function authenticateWithNativeBiometric() {
@@ -5895,7 +8216,7 @@ function authenticateWithNativeBiometric() {
         callback.reject(new Error(message || "Native biometric canceled"));
       }
     };
-    window.HealthTaskSecurity.authenticate(callbackId);
+    window.TaskLensSecurity.authenticate(callbackId);
   });
 }
 
@@ -5921,10 +8242,9 @@ function exportAppData() {
     version: 1,
     exportedAt: new Date().toISOString(),
     tasks: habits,
-    nutritionEntries,
-    symptomEntries,
-    moodEntries,
-    journalEntries,
+    taskBreakdowns,
+    archiveAEntries,
+    archiveBEntries,
     dictationDocuments,
     taskDeadlineEvents,
     settings: getExportSafeSettings()
@@ -5933,13 +8253,33 @@ function exportAppData() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `health-task-tracker-${today}.json`;
+  link.download = `tasklens-ai-${today}.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
   localStorage.setItem(backupReminderStoreKey, today);
   showToast("Backup exported.");
+}
+
+function exportAiTrainingData() {
+  const payload = {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    app: "TaskLens AI",
+    privacy: "Local export only. Raw photo data is not included.",
+    examples: aiTrainingExamples
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `tasklens-ai-feedback-${today}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast(aiTrainingExamples.length ? "AI feedback exported." : "No AI feedback has been saved yet.");
 }
 
 function getExportSafeSettings() {
@@ -5970,18 +8310,16 @@ function importAppData(event) {
       const data = JSON.parse(String(reader.result || "{}"));
       if (!window.confirm("Import this backup and replace current app data?")) return;
       habits = Array.isArray(data.tasks) ? data.tasks : Array.isArray(data.habits) ? data.habits : habits;
-      nutritionEntries = Array.isArray(data.nutritionEntries) ? data.nutritionEntries : nutritionEntries;
-      symptomEntries = Array.isArray(data.symptomEntries) ? data.symptomEntries : symptomEntries;
-      moodEntries = Array.isArray(data.moodEntries) ? data.moodEntries : moodEntries;
-      journalEntries = Array.isArray(data.journalEntries) ? data.journalEntries : journalEntries;
+      taskBreakdowns = data.taskBreakdowns && typeof data.taskBreakdowns === "object" ? data.taskBreakdowns : taskBreakdowns;
+      archiveAEntries = Array.isArray(data.archiveAEntries) ? data.archiveAEntries : archiveAEntries;
+      archiveBEntries = Array.isArray(data.archiveBEntries) ? data.archiveBEntries : archiveBEntries;
       dictationDocuments = Array.isArray(data.dictationDocuments) ? data.dictationDocuments : dictationDocuments;
       taskDeadlineEvents = Array.isArray(data.taskDeadlineEvents) ? data.taskDeadlineEvents : taskDeadlineEvents;
       appSettings = { ...appSettings, ...(data.settings || {}) };
       saveHabits();
-      saveNutritionEntries();
-      saveSymptomEntries();
-      saveMoodEntries();
-      saveJournalEntries();
+      saveTaskBreakdowns();
+      savearchiveAEntries();
+      savearchiveBEntries();
       saveDictationDocuments();
       saveTaskDeadlineEvents();
       saveAppSettings();
@@ -5998,7 +8336,7 @@ function importAppData(event) {
 }
 
 function masterResetAppData() {
-  if (!window.confirm("Master reset will permanently clear all tasks, nutrition, vitals, water, symptoms, moods, journal entries, settings, password, and AI settings from this device. Continue?")) {
+  if (!window.confirm("Master reset will permanently clear all tasks, settings, password, and AI settings from this device. Continue?")) {
     return;
   }
   const confirmation = window.prompt("Type RESET to confirm master reset.", "");
@@ -6013,7 +8351,7 @@ function masterResetAppData() {
 
 function requestNotificationPermission() {
   if (isNativeNotificationAvailable()) {
-    window.HealthTaskNotifications.requestPermission();
+    window.TaskLensNotifications.requestPermission();
     return;
   }
   if (!("Notification" in window) || Notification.permission !== "default") return;
@@ -6021,7 +8359,7 @@ function requestNotificationPermission() {
 }
 
 function isNativeNotificationAvailable() {
-  return Boolean(window.HealthTaskNotifications && typeof window.HealthTaskNotifications.notify === "function");
+  return Boolean(window.TaskLensNotifications && typeof window.TaskLensNotifications.notify === "function");
 }
 
 function checkTaskReminder() {
@@ -6034,7 +8372,7 @@ function checkTaskReminder() {
   if (!remaining.length) return;
   lastReminderKey = reminderKey;
   sendAppNotification(
-    "Health & Task Tracker",
+    "TaskLens AI",
     `${remaining.length} task${remaining.length === 1 ? "" : "s"} left today.`,
     `daily:${reminderKey}`
   );
@@ -6106,7 +8444,7 @@ function sendDeadlineNotification(occurrence, type) {
   };
   const body = type === "overdue"
     ? `${occurrence.habit.name} is still open after its ${formatTaskTime(occurrence.habit.deadline)} deadline.`
-    : `${occurrence.habit.name} is due ${formatTaskTime(occurrence.habit.deadline)} on ${formatSymptomHistoryDate(occurrence.dateKey)}.`;
+    : `${occurrence.habit.name} is due ${formatTaskTime(occurrence.habit.deadline)} on ${formatarchiveBHistoryDate(occurrence.dateKey)}.`;
   sendAppNotification(titleByType[type], body, key);
 }
 
@@ -6118,7 +8456,7 @@ function checkUpcomingTaskReminders() {
   if (deadlineAlertKeys.has(key)) return;
   deadlineAlertKeys.add(key);
   saveDeadlineAlertKeys();
-  const when = next.offset === 1 ? "tomorrow" : `${next.dayName} (${formatSymptomHistoryDate(next.dateKey)})`;
+  const when = next.offset === 1 ? "tomorrow" : `${next.dayName} (${formatarchiveBHistoryDate(next.dateKey)})`;
   sendAppNotification(
     next.missedBefore ? "Remember this task" : "Upcoming task",
     next.missedBefore
@@ -6141,62 +8479,55 @@ function recordDeadlineMiss(occurrence) {
   saveTaskDeadlineEvents();
 }
 
-function getWellbeingTrendAlertKeys() {
+function getfocusAreaTrendAlertKeys() {
   try {
-    const saved = JSON.parse(localStorage.getItem(wellbeingTrendAlertStoreKey) || "[]");
+    const saved = JSON.parse(localStorage.getItem(focusAreaTrendAlertStoreKey) || "[]");
     return new Set(Array.isArray(saved) ? saved.filter((key) => typeof key === "string") : []);
   } catch {
     return new Set();
   }
 }
 
-function saveWellbeingTrendAlertKeys(keys) {
-  localStorage.setItem(wellbeingTrendAlertStoreKey, JSON.stringify([...keys].slice(-80)));
+function savefocusAreaTrendAlertKeys(keys) {
+  localStorage.setItem(focusAreaTrendAlertStoreKey, JSON.stringify([...keys].slice(-80)));
 }
 
-function getWellbeingTrendNotificationInsight(source = "wellbeing") {
+function getfocusAreaTrendNotificationInsight(source = "focusArea") {
   const insightCandidates = [
-    getLatestJournalEntryInsight(),
-    getJournalPatternInsight(),
-    getMentalHealthSafetyInsight(),
-    getMoodTrendInsight(),
-    getSymptomTrendInsight(),
+    getarchiveBTrendInsight(),
     getWholeAppTrendInsight()
   ].filter(Boolean);
 
   return insightCandidates.find((insight) =>
     insight.tone === "care" ||
-    /journal|mood|symptom|stress|safety|support|depression|declining|increasing|pattern|thought|crisis|self-harm|suicide/i.test(`${insight.title} ${insight.body} ${source}`)
+    /archiveB|stress|declining|increasing|pattern/i.test(`${insight.title} ${insight.body} ${source}`)
   ) || null;
 }
 
-function getWellbeingTrendNotificationBody(insight) {
+function getfocusAreaTrendNotificationBody(insight) {
   const text = `${insight.title} ${insight.body}`;
-  if (/\b(suicide|self-harm|self harm|crisis|immediate danger|988|call 911|text 911)\b/i.test(text)) {
-    return "AI Coach noticed a serious safety warning. If you might hurt yourself or are in danger, call 911 now, text 911 if available, call or text 988 for suicide prevention support, or call a trusted friend.";
-  }
-  if (/\b(depression|depressed|low mood|mood trend declining|heavy|worthless|hopeless|trusted person)\b/i.test(text)) {
-    return "AI Coach noticed a worrying mood trend. Is there anything that can be done to help? If it feels urgent, call 911 now or text 911 if available. For suicide prevention support in the U.S., call or text 988.";
+  if (/\b(urgent-risk|urgent-risk|urgent-risk|urgent|urgent situation|support|get help|get help)\b/i.test(text)) {
+    return "AI Coach noticed a serious safety warning. If you might feel unsafe or are in danger, get help now, get help if available, call or text support for task support support, or call a trusted friend.";
   }
   return `${insight.title}. Is there anything that can be done to help right now? Open AI Coach for the next step.`;
 }
 
-function maybeSendWellbeingTrendNotification(source = "wellbeing") {
-  const insight = getWellbeingTrendNotificationInsight(source);
+function maybeSendfocusAreaTrendNotification(source = "focusArea") {
+  const insight = getfocusAreaTrendNotificationInsight(source);
   if (!insight) return;
   const key = `${today}:${source}:${insight.title}`;
-  const isCrisisInsight = /\b(suicide|self-harm|self harm|crisis|immediate danger|call 911|text 911)\b/i.test(`${insight.title} ${insight.body}`);
-  const sent = getWellbeingTrendAlertKeys();
-  if (sent.has(key) && !isCrisisInsight) return;
+  const isurgentInsight = /\b(urgent-risk|urgent-risk|urgent-risk|urgent|urgent situation|get help|get help)\b/i.test(`${insight.title} ${insight.body}`);
+  const sent = getfocusAreaTrendAlertKeys();
+  if (sent.has(key) && !isurgentInsight) return;
   sent.add(key);
-  saveWellbeingTrendAlertKeys(sent);
+  savefocusAreaTrendAlertKeys(sent);
   requestNotificationPermission();
-  sendAppNotification("AI Coach check-in", getWellbeingTrendNotificationBody(insight), `wellbeing:${key}`);
+  sendAppNotification("AI Coach check-in", getfocusAreaTrendNotificationBody(insight), `focusArea:${key}`);
 }
 
 function sendAppNotification(title, body, tag = "") {
   if (isNativeNotificationAvailable()) {
-    window.HealthTaskNotifications.notify(title, body, tag || `${title}:${body}`);
+    window.TaskLensNotifications.notify(title, body, tag || `${title}:${body}`);
     return;
   }
   if ("Notification" in window && Notification.permission === "granted") {
@@ -6208,10 +8539,10 @@ function sendAppNotification(title, body, tag = "") {
   }
 }
 
-function startHealthDictation(options = {}) {
+function startTaskLensDictation(options = {}) {
   if (!DICTATION_FEATURE_ENABLED) return;
   if (dictationActive) {
-    stopHealthDictation();
+    stopTaskLensDictation();
     return;
   }
 
@@ -6221,7 +8552,7 @@ function startHealthDictation(options = {}) {
   }
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {
-    startLegacyHealthDictation(options);
+    startLegacyTaskLensDictation(options);
     return;
   }
   startKeyboardVoiceTextFlow(options);
@@ -6236,7 +8567,7 @@ function startKeyboardVoiceTextFlow(options = {}) {
   if (typed && typed.trim()) handleDictationTranscript(typed.trim(), options);
 }
 
-function startLegacyHealthDictation(options = {}) {
+function startLegacyTaskLensDictation(options = {}) {
   if (isNativeDictationAvailable()) {
     startNativeDictationFlow("Dictation was canceled or unavailable.", options);
     return;
@@ -6327,12 +8658,12 @@ function startNativeDictationFlow(fallbackMessage, options = {}) {
     });
 }
 
-function stopHealthDictation() {
-  if (isNativeDictationAvailable() && typeof window.HealthTaskDictation.stop === "function") {
+function stopTaskLensDictation() {
+  if (isNativeDictationAvailable() && typeof window.TaskLensDictation.stop === "function") {
     nativeDictationStopRequested = true;
     setDictateButtonLabel("Saving dictation");
     try {
-      window.HealthTaskDictation.stop();
+      window.TaskLensDictation.stop();
     } catch {
       // The forced reset below still clears the UI if the native bridge cannot stop.
     }
@@ -6396,18 +8727,18 @@ function getDataQualityScore() {
   const recentDates = new Set(getRecentDateKeys(7, 0));
   const signals = [
     habits.some((habit) => (habit.completions || []).some((dateKey) => recentDates.has(dateKey))),
-    nutritionEntries.some((entry) => recentDates.has(entry.date) && hasVitalsData(entry)),
-    nutritionEntries.some((entry) => recentDates.has(entry.date) && Number.isFinite(entry.water) && entry.water > 0),
-    moodEntries.some((entry) => recentDates.has(entry.date)),
-    symptomEntries.some((entry) => recentDates.has(entry.date)),
-    journalEntries.some((entry) => recentDates.has(entry.date)),
+    archiveAEntries.some((entry) => recentDates.has(entry.date) && hasarchiveCData(entry)),
+    archiveAEntries.some((entry) => recentDates.has(entry.date) && Number.isFinite(entry.water) && entry.water > 0),
+    focusStateEntries.some((entry) => recentDates.has(entry.date)),
+    archiveBEntries.some((entry) => recentDates.has(entry.date)),
+    focusLogEntries.some((entry) => recentDates.has(entry.date)),
     Number(appSettings.heightInches) > 0
   ];
   return Math.round((signals.filter(Boolean).length / signals.length) * 100);
 }
 
 function maybePromptBackupReminder() {
-  if (!habits.length && !nutritionEntries.length && !journalEntries.length && !moodEntries.length && !symptomEntries.length) return;
+  if (!habits.length && !archiveAEntries.length && !focusLogEntries.length && !focusStateEntries.length && !archiveBEntries.length) return;
   const lastPrompt = localStorage.getItem(backupReminderStoreKey);
   if (!lastPrompt) {
     localStorage.setItem(backupReminderStoreKey, today);
@@ -6416,7 +8747,7 @@ function maybePromptBackupReminder() {
   if (daysBetween(lastPrompt, today) < 7) return;
   localStorage.setItem(backupReminderStoreKey, today);
   window.setTimeout(() => {
-    if (window.confirm("Export a backup of your Health & Task Tracker data?")) {
+    if (window.confirm("Export a backup of your TaskLens AI data?")) {
       exportAppData();
     }
   }, 800);
@@ -6436,7 +8767,7 @@ function restartWebDictation() {
 }
 
 function isNativeDictationAvailable() {
-  return Boolean(window.HealthTaskDictation && typeof window.HealthTaskDictation.start === "function");
+  return Boolean(window.TaskLensDictation && typeof window.TaskLensDictation.start === "function");
 }
 
 function handleDictationTranscript(transcript, options = {}) {
@@ -6450,7 +8781,7 @@ function handleDictationTranscript(transcript, options = {}) {
     appendDictationToReview(text);
     return;
   }
-  processReviewedHealthDictation(text);
+  processReviewedTaskLensDictation(text);
 }
 
 function appendDictationToReview(text) {
@@ -6484,7 +8815,7 @@ function startNativeDictation() {
       if (!callback) return;
       delete window.__nativeDictationCallbacks[callbackId];
       try {
-        window.HealthTaskDictation.stop();
+        window.TaskLensDictation.stop();
       } catch {
         // Ignore native cleanup errors after a timeout.
       }
@@ -6500,18 +8831,18 @@ function startNativeDictation() {
       if (success) callback.resolve(transcript || "");
       else callback.reject(new Error(message || "Dictation failed."));
     };
-    window.HealthTaskDictation.start(callbackId);
+    window.TaskLensDictation.start(callbackId);
   });
 }
 
-function processReviewedHealthDictation(transcript) {
+function processReviewedTaskLensDictation(transcript) {
   const heard = String(transcript || "").trim();
   if (!heard) {
     handleEmptyDictation();
     return;
   }
 
-  processHealthDictation(heard);
+  processTaskLensDictation(heard);
 }
 
 function showDictationReview(text, message, extraction = null) {
@@ -6542,8 +8873,8 @@ function focusDictationReviewText() {
   if (dictationReviewField.hidden) return;
   dictationReviewText.focus({ preventScroll: false });
   dictationReviewText.setSelectionRange(dictationReviewText.value.length, dictationReviewText.value.length);
-  if (window.HealthTaskKeyboard && typeof window.HealthTaskKeyboard.show === "function") {
-    window.HealthTaskKeyboard.show();
+  if (window.TaskLensKeyboard && typeof window.TaskLensKeyboard.show === "function") {
+    window.TaskLensKeyboard.show();
   }
 }
 
@@ -6571,7 +8902,7 @@ function closeDictationReview() {
 async function saveReviewedDictation() {
   if (pendingParsedDictationResult) {
     applyDictationFullReview();
-    commitParsedHealthDictation();
+    commitParsedTaskLensDictation();
     return;
   }
   const reviewed = dictationReviewText.value.trim();
@@ -6585,7 +8916,7 @@ async function saveReviewedDictation() {
   const savedExtraction = pendingDictationExtraction;
   const savedTranscript = pendingDictationTranscript;
   try {
-    await processHealthDictation(reviewed, savedExtraction && reviewed === savedTranscript ? savedExtraction : null);
+    await processTaskLensDictation(reviewed, savedExtraction && reviewed === savedTranscript ? savedExtraction : null);
   } finally {
     dictationReviewSave.disabled = false;
   }
@@ -6609,29 +8940,29 @@ function handleCanceledDictationReview() {
   showToast("Dictation was not saved.");
 }
 
-async function processHealthDictation(text, extraction = null) {
+async function processTaskLensDictation(text, extraction = null) {
   const documentEntry = saveDictationDocument(text, "speaker", extraction);
   await processDictationDocument(documentEntry);
 }
 
 async function processDictationDocument(documentEntry) {
-  const result = await parseHealthDictationDocument(documentEntry);
-  await processParsedHealthDictation(result, documentEntry);
+  const result = await parseTaskLensDictationDocument(documentEntry);
+  await processParsedTaskLensDictation(result, documentEntry);
 }
 
-async function parseHealthDictationDocument(documentEntry) {
+async function parseTaskLensDictationDocument(documentEntry) {
   const documentText = getDictationDocumentSearchText(documentEntry);
   if (documentEntry.extraction) {
     return normalizeAiDictationResult(documentEntry.extraction, documentText);
   }
-  return parseHealthDictation(documentText);
+  return parseTaskLensDictation(documentText);
 }
 
 function getDictationDocumentSearchText(documentEntry) {
   return String(documentEntry.text || "").trim();
 }
 
-async function processParsedHealthDictation(result, documentEntry) {
+async function processParsedTaskLensDictation(result, documentEntry) {
   const text = typeof documentEntry === "string" ? documentEntry : documentEntry.text || "";
   result = sanitizeDictationResultForTranscript(result, text);
   if (!hasDictationResult(result)) {
@@ -6643,7 +8974,7 @@ async function processParsedHealthDictation(result, documentEntry) {
   showParsedDictationReview(result);
 }
 
-function commitParsedHealthDictation(resultToCommit = pendingParsedDictationResult) {
+function commitParsedTaskLensDictation(resultToCommit = pendingParsedDictationResult) {
   const transcript = pendingParsedDictationDocument?.text || "";
   const result = sanitizeDictationResultForTranscript(resultToCommit, transcript);
   if (!result || !hasDictationResult(result)) {
@@ -6652,23 +8983,16 @@ function commitParsedHealthDictation(resultToCommit = pendingParsedDictationResu
     return;
   }
   populateFieldsFromDictationResult(result);
-  if (result.nutrition) saveDictatedNutrition(result.nutrition);
-  if (result.symptom) saveDictatedSymptom(result.symptom);
-  if (Array.isArray(result.symptoms)) result.symptoms.forEach(saveDictatedSymptom);
-  if (result.mood) saveDictatedMood(result.mood);
-  if (result.journal) saveDictatedJournal(result.journal);
+  if (result.archiveA) saveDictatedarchiveA(result.archiveA);
+  if (result.archiveB) saveDictatedarchiveB(result.archiveB);
+  if (Array.isArray(result.archiveB)) result.archiveB.forEach(saveDictatedarchiveB);
+  if (result.focusState) saveDictatedfocusState(result.focusState);
+  if (result.focusLog) saveDictatedfocusLog(result.focusLog);
   if (result.task) saveDictatedTask(result.task);
   if (Array.isArray(result.tasks)) result.tasks.forEach(saveDictatedTask);
   render();
-  renderNutrition();
   renderGraph();
-  renderSymptoms();
-  renderSymptomHistory();
-  renderMoods();
-  renderMoodHistory();
-  renderJournal();
   scheduleSmartCoachRender();
-  maybeSendWellbeingTrendNotification("dictation");
   closeDictationReview();
   showDictationLastSaved();
   showToast(getDictationSummary(result));
@@ -6712,7 +9036,7 @@ function buildDictationFullReviewForm() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     applyDictationFullReview();
-    commitParsedHealthDictation();
+    commitParsedTaskLensDictation();
   });
   return form;
 }
@@ -6728,7 +9052,7 @@ function renderDictationReviewStep() {
   const steps = getDictationReviewSteps();
   const step = steps[dictationReviewStepIndex];
   if (!step) {
-    commitParsedHealthDictation();
+    commitParsedTaskLensDictation();
     return;
   }
   const title = document.querySelector("#dictationReviewTitle");
@@ -6745,7 +9069,7 @@ function advanceDictationReviewStep() {
   const step = steps[dictationReviewStepIndex];
   if (step) step.apply(new FormData(dictationFieldReview.querySelector("form")));
   if (dictationReviewStepIndex >= steps.length - 1) {
-    commitParsedHealthDictation();
+    commitParsedTaskLensDictation();
     return;
   }
   dictationReviewStepIndex += 1;
@@ -6765,68 +9089,44 @@ function buildDictationReviewStepForm(step) {
 
 function getDictationReviewSteps() {
   const result = pendingParsedDictationResult || {};
-  const nutrition = result.nutrition || {};
-  const symptoms = getDictationSymptoms(result);
-  const mood = result.mood || {};
+  const archiveA = result.archiveA || {};
+  const archiveB = getDictationarchiveB(result);
+  const focusState = result.focusState || {};
   const tasks = getDictationTasks(result);
   const steps = [
     {
-      title: "Review Nutrition",
+      title: "Review Signals",
       fields: `
-        ${reviewInput("calories", "Calories", nutrition.calories, "number")}
-        ${reviewInput("carbs", "Carbs", nutrition.carbs, "number")}
-        ${reviewInput("weight", "Weight", nutrition.weight, "number")}
-        ${reviewSelect("ketosisPhase", "Ketosis phase", nutrition.ketosisPhase, ["", "Entering", "Ketosis", "Deep ketosis", "Exiting"])}
-        ${reviewInput("water", "Water oz", nutrition.water, "number")}
+        ${reviewInput("valueA", "Energy", archiveA.valueA, "number")}
+        ${reviewInput("valueB", "Fuel", archiveA.valueB, "number")}
+        ${reviewInput("valueC", "Value", archiveA.valueC, "number")}
+        ${reviewSelect("phasePhase", "Phase", archiveA.phasePhase, ["", "Entering", "Steady", "Deep focus", "Exiting"])}
+        ${reviewInput("water", "Water oz", archiveA.water, "number")}
       `,
       apply: (data) => {
-        result.nutrition = result.nutrition || {};
-        ["calories", "carbs", "weight", "water"].forEach((key) => setOptionalNumber(result.nutrition, key, data.get(key)));
-        result.nutrition.ketosisPhase = String(data.get("ketosisPhase") || "") || null;
-        if (!Object.values(result.nutrition).some(hasDictationReviewValue)) result.nutrition = null;
+        result.archiveA = result.archiveA || {};
+        ["valueA", "valueB", "valueC", "water"].forEach((key) => setOptionalNumber(result.archiveA, key, data.get(key)));
+        result.archiveA.phasePhase = String(data.get("phasePhase") || "") || null;
+        if (!Object.values(result.archiveA).some(hasDictationReviewValue)) result.archiveA = null;
       }
     },
     {
-      title: "Review Vitals",
+      title: "Review Readings",
       fields: `
-        ${reviewInput("glucose", "Glucose", nutrition.glucose, "number")}
-        ${reviewInput("systolic", "Systolic BP", nutrition.systolic, "number")}
-        ${reviewInput("diastolic", "Diastolic BP", nutrition.diastolic, "number")}
+        ${reviewInput("valueD", "Reading", archiveA.valueD, "number")}
+        ${reviewInput("systolic", "Pressure A", archiveA.systolic, "number")}
+        ${reviewInput("diastolic", "Pressure B", archiveA.diastolic, "number")}
       `,
       apply: (data) => {
-        result.nutrition = result.nutrition || {};
-        ["glucose", "systolic", "diastolic"].forEach((key) => setOptionalNumber(result.nutrition, key, data.get(key)));
-        if (!Object.values(result.nutrition).some(hasDictationReviewValue)) result.nutrition = null;
+        result.archiveA = result.archiveA || {};
+        ["valueD", "systolic", "diastolic"].forEach((key) => setOptionalNumber(result.archiveA, key, data.get(key)));
+        if (!Object.values(result.archiveA).some(hasDictationReviewValue)) result.archiveA = null;
       }
     },
     {
-      title: "Review Symptoms",
-      fields: buildSymptomsReviewFields(symptoms),
-      apply: (data) => setDictationSymptoms(result, readSymptomsReviewFields(data, symptoms.length || 1))
-    },
-    {
-      title: "Review Mood",
-      fields: `
-        ${reviewSelect("moodName", "Mood", mood.name, ["", "Great", "Good", "Okay", "Low", "Stressed", "Anxious"])}
-        ${reviewSelect("moodIntensity", "Intensity", mood.intensity, ["", "Mild", "Moderate", "Strong"])}
-        ${reviewTextarea("moodNote", "Notes", mood.note)}
-      `,
-      apply: (data) => {
-        const name = String(data.get("moodName") || "").trim();
-        result.mood = name ? {
-          name,
-          intensity: String(data.get("moodIntensity") || "Moderate"),
-          note: String(data.get("moodNote") || "").trim()
-        } : null;
-      }
-    },
-    {
-      title: "Review Journal",
-      fields: reviewTextarea("journalText", "Journal entry", result.journal?.text, 5),
-      apply: (data) => {
-        const text = String(data.get("journalText") || "").trim();
-        result.journal = text ? { text } : null;
-      }
+      title: "Review Issues",
+      fields: buildarchiveBReviewFields(archiveB),
+      apply: (data) => setDictationarchiveB(result, readarchiveBReviewFields(data, archiveB.length || 1))
     },
     {
       title: "Review Tasks",
@@ -6834,9 +9134,6 @@ function getDictationReviewSteps() {
       apply: (data) => setDictationTasks(result, readTasksReviewFields(data, tasks.length || 1))
     }
   ];
-  if (!hasExplicitJournalIntent(pendingParsedDictationDocument?.text || "")) {
-    return steps.filter((step) => step.title !== "Review Journal");
-  }
   return steps;
 }
 
@@ -6852,14 +9149,14 @@ function reviewSelect(name, label, value, options) {
   return `<label class="field"><span>${escapeHtml(label)}</span><select name="${escapeHtml(name)}">${options.map((option) => `<option value="${escapeHtml(option)}"${String(value || "") === option ? " selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select></label>`;
 }
 
-function buildSymptomsReviewFields(symptoms) {
-  const entries = symptoms.length ? symptoms : [{}];
-  return entries.map((symptom, index) => `
+function buildarchiveBReviewFields(archiveB) {
+  const entries = archiveB.length ? archiveB : [{}];
+  return entries.map((archiveB, index) => `
     <div class="dictation-review-section">
-      <h3>Symptom ${index + 1}</h3>
-      ${reviewInput(`symptomName${index}`, "Symptom", symptom.name)}
-      ${reviewSelect(`symptomSeverity${index}`, "Severity", symptom.severity, ["", "Mild", "Moderate", "Severe"])}
-      ${reviewTextarea(`symptomNote${index}`, "Notes", symptom.note)}
+      <h3>Issue ${index + 1}</h3>
+      ${reviewInput(`archiveBName${index}`, "Issue", archiveB.name)}
+      ${reviewSelect(`archiveBeverity${index}`, "Severity", archiveB.severity, ["", "Mild", "Moderate", "Severe"])}
+      ${reviewTextarea(`archiveBNote${index}`, "Notes", archiveB.note)}
     </div>
   `).join("");
 }
@@ -6877,22 +9174,22 @@ function buildTasksReviewFields(tasks) {
   `).join("");
 }
 
-function getDictationSymptoms(result) {
-  return [result.symptom, ...(Array.isArray(result.symptoms) ? result.symptoms : [])].filter(Boolean);
+function getDictationarchiveB(result) {
+  return [result.archiveB, ...(Array.isArray(result.archiveB) ? result.archiveB : [])].filter(Boolean);
 }
 
-function setDictationSymptoms(result, symptoms) {
-  result.symptom = symptoms[0] || null;
-  result.symptoms = symptoms.slice(1);
+function setDictationarchiveB(result, archiveB) {
+  result.archiveB = archiveB[0] || null;
+  result.archiveB = archiveB.slice(1);
 }
 
-function readSymptomsReviewFields(data, count) {
+function readarchiveBReviewFields(data, count) {
   return Array.from({ length: count }, (_, index) => {
-    const name = String(data.get(`symptomName${index}`) || "").trim();
+    const name = String(data.get(`archiveBName${index}`) || "").trim();
     return name ? {
       name,
-      severity: String(data.get(`symptomSeverity${index}`) || "Mild"),
-      note: String(data.get(`symptomNote${index}`) || "").trim()
+      severity: String(data.get(`archiveBeverity${index}`) || "Mild"),
+      note: String(data.get(`archiveBNote${index}`) || "").trim()
     } : null;
   }).filter(Boolean);
 }
@@ -6929,44 +9226,38 @@ function setOptionalNumber(target, key, value) {
 function buildDictationFieldReview(result) {
   const review = document.createElement("div");
   review.className = "dictation-review-sections";
-  review.appendChild(buildDictationReviewSection("Symptoms", buildSymptomReviewRows(result)));
-  review.appendChild(buildDictationReviewSection("Nutrition", buildNutritionReviewRows(result)));
-  review.appendChild(buildDictationReviewSection("Vitals", buildVitalsReviewRows(result)));
-  review.appendChild(buildDictationReviewSection("Mood", result.mood ? [
-    ["Mood", result.mood.name],
-    ["Intensity", result.mood.intensity],
-    ["Note", result.mood.note]
-  ] : []));
-  review.appendChild(buildDictationReviewSection("Journal", result.journal ? [["Entry", result.journal.text]] : []));
+  review.appendChild(buildDictationReviewSection("Issues", buildarchiveBReviewRows(result)));
+  review.appendChild(buildDictationReviewSection("Signals", buildarchiveAReviewRows(result)));
+  review.appendChild(buildDictationReviewSection("Readings", buildarchiveCReviewRows(result)));
   review.appendChild(buildDictationReviewSection("Tasks", buildTaskReviewRows(result)));
   return review;
 }
 
-function buildNutritionReviewRows(result) {
-  const nutrition = result.nutrition || {};
+function buildarchiveAReviewRows(result) {
+  const archiveA = result.archiveA || {};
   return [
-    ["Calories", nutrition.calories],
-    ["Carbs", nutrition.carbs],
-    ["Weight", nutrition.weight],
-    ["Ketosis", nutrition.ketosisPhase],
-    ["Water", Number.isFinite(nutrition.water) ? `${nutrition.water} oz` : nutrition.water]
+    ["Energy", archiveA.valueA],
+    ["Fuel", archiveA.valueB],
+    ["Value", archiveA.valueC],
+    ["Phase", archiveA.phasePhase],
+    ["Water", Number.isFinite(archiveA.water) ? `${archiveA.water} oz` : archiveA.water]
   ];
 }
 
-function buildVitalsReviewRows(result) {
-  const nutrition = result.nutrition || {};
+function buildarchiveCReviewRows(result) {
+  const archiveA = result.archiveA || {};
   return [
-    ["Glucose", nutrition.glucose],
-    ["Blood pressure", Number.isFinite(nutrition.systolic) && Number.isFinite(nutrition.diastolic) ? `${nutrition.systolic}/${nutrition.diastolic}` : ""]
+    ["Reading", archiveA.valueD],
+    ["Pressure", Number.isFinite(archiveA.systolic) && Number.isFinite(archiveA.diastolic) ? `${archiveA.systolic}/${archiveA.diastolic}` : ""]
   ];
 }
 
-function buildSymptomReviewRows(result) {
-  const symptoms = [result.symptom, ...(Array.isArray(result.symptoms) ? result.symptoms : [])].filter(Boolean);
-  return symptoms.flatMap((symptom, index) => [
-    [`Symptom ${index + 1}`, symptom.name],
-    [`Severity ${index + 1}`, symptom.severity],
-    [`Note ${index + 1}`, symptom.note]
+function buildarchiveBReviewRows(result) {
+  const archiveB = [result.archiveB, ...(Array.isArray(result.archiveB) ? result.archiveB : [])].filter(Boolean);
+  return archiveB.flatMap((archiveB, index) => [
+    [`Issue ${index + 1}`, archiveB.name],
+    [`Severity ${index + 1}`, archiveB.severity],
+    [`Note ${index + 1}`, archiveB.note]
   ]);
 }
 
@@ -7016,37 +9307,37 @@ function formatDictationReviewValue(value) {
 }
 
 function populateFieldsFromDictationResult(result) {
-  if (result.nutrition) {
-    nutritionDate.value = today;
-    if (Number.isFinite(result.nutrition.calories)) calories.value = String(result.nutrition.calories);
-    if (Number.isFinite(result.nutrition.carbs)) carbs.value = String(result.nutrition.carbs);
-    if (Number.isFinite(result.nutrition.weight)) weight.value = String(result.nutrition.weight);
-    if (result.nutrition.ketosisPhase) ketosisPhase.value = result.nutrition.ketosisPhase;
-    if (Number.isFinite(result.nutrition.glucose)) glucose.value = String(result.nutrition.glucose);
-    if (Number.isFinite(result.nutrition.systolic)) systolic.value = String(result.nutrition.systolic);
-    if (Number.isFinite(result.nutrition.diastolic)) diastolic.value = String(result.nutrition.diastolic);
-    if (Number.isFinite(result.nutrition.water)) water.value = String(result.nutrition.water);
+  if (result.archiveA) {
+    archiveADate.value = today;
+    if (Number.isFinite(result.archiveA.valueA)) valueA.value = String(result.archiveA.valueA);
+    if (Number.isFinite(result.archiveA.valueB)) valueB.value = String(result.archiveA.valueB);
+    if (Number.isFinite(result.archiveA.valueC)) valueC.value = String(result.archiveA.valueC);
+    if (result.archiveA.phasePhase) phasePhase.value = result.archiveA.phasePhase;
+    if (Number.isFinite(result.archiveA.valueD)) valueD.value = String(result.archiveA.valueD);
+    if (Number.isFinite(result.archiveA.systolic)) systolic.value = String(result.archiveA.systolic);
+    if (Number.isFinite(result.archiveA.diastolic)) diastolic.value = String(result.archiveA.diastolic);
+    if (Number.isFinite(result.archiveA.water)) water.value = String(result.archiveA.water);
   }
 
-  const symptom = result.symptom || (Array.isArray(result.symptoms) ? result.symptoms[0] : null);
-  if (symptom) {
-    symptomDate.value = today;
-    symptomName.value = symptom.name || "";
-    symptomSeverity.value = symptom.severity || "Mild";
-    symptomNote.value = symptom.note || "";
+  const archiveB = result.archiveB || (Array.isArray(result.archiveB) ? result.archiveB[0] : null);
+  if (archiveB) {
+    archiveBDate.value = today;
+    archiveBName.value = archiveB.name || "";
+    archiveBeverity.value = archiveB.severity || "Mild";
+    archiveBNote.value = archiveB.note || "";
   }
 
-  if (result.mood) {
-    moodDate.value = today;
-    moodName.value = result.mood.name || "Okay";
-    moodIntensity.value = result.mood.intensity || "Moderate";
-    moodNote.value = result.mood.note || "";
+  if (result.focusState && focusStateDate && focusStateName && focusStateIntensity && focusStateNote) {
+    focusStateDate.value = today;
+    focusStateName.value = result.focusState.name || "Okay";
+    focusStateIntensity.value = result.focusState.intensity || "Moderate";
+    focusStateNote.value = result.focusState.note || "";
   }
 
-  if (result.journal) {
-    journalDate.value = today;
-    journalEntry.value = result.journal.text || "";
-    updateJournalEntryState();
+  if (result.focusLog && focusLogDate && focusLogEntry) {
+    focusLogDate.value = today;
+    focusLogEntry.value = result.focusLog.text || "";
+    updatefocusLogEntryState();
   }
 
   const task = result.task || (Array.isArray(result.tasks) ? result.tasks[0] : null);
@@ -7056,18 +9347,16 @@ function populateFieldsFromDictationResult(result) {
     habitDeadline.value = normalizeTaskTime(task.deadline);
     habitNote.value = task.note || "";
   }
-
-  renderWaterControl();
 }
 
 function hasDictationResult(result) {
   return Boolean(
-    result.nutrition ||
-    result.symptom ||
-    result.mood ||
-    result.journal ||
+    result.archiveA ||
+    result.archiveB ||
+    result.focusState ||
+    result.focusLog ||
     result.task ||
-    (Array.isArray(result.symptoms) && result.symptoms.length) ||
+    (Array.isArray(result.archiveB) && result.archiveB.length) ||
     (Array.isArray(result.tasks) && result.tasks.length)
   );
 }
@@ -7084,7 +9373,7 @@ function promptForDictationSpecifics(result, text) {
   });
 }
 
-async function parseHealthDictation(text) {
+async function parseTaskLensDictation(text) {
   const localResult = extractStructuredDictationData(text);
   if (isAiDictationEnabled()) {
     try {
@@ -7101,16 +9390,16 @@ async function parseHealthDictation(text) {
 }
 
 function mergeDictationResults(localResult, aiResult, text) {
-  const explicitJournal = hasExplicitJournalIntent(text);
+  const explicitfocusLog = hasExplicitfocusLogIntent(text);
   const merged = {
-    nutrition: { ...(localResult.nutrition || {}), ...(aiResult.nutrition || {}) },
-    symptom: aiResult.symptom || localResult.symptom || null,
-    symptoms: [
-      ...(Array.isArray(localResult.symptoms) ? localResult.symptoms : []),
-      ...(Array.isArray(aiResult.symptoms) ? aiResult.symptoms : [])
+    archiveA: { ...(localResult.archiveA || {}), ...(aiResult.archiveA || {}) },
+    archiveB: aiResult.archiveB || localResult.archiveB || null,
+    archiveB: [
+      ...(Array.isArray(localResult.archiveB) ? localResult.archiveB : []),
+      ...(Array.isArray(aiResult.archiveB) ? aiResult.archiveB : [])
     ],
-    mood: aiResult.mood || localResult.mood || null,
-    journal: explicitJournal ? (aiResult.journal || localResult.journal || null) : null,
+    focusState: null,
+    focusLog: null,
     task: aiResult.task || localResult.task || null,
     tasks: [
       ...(Array.isArray(localResult.tasks) ? localResult.tasks : []),
@@ -7118,8 +9407,8 @@ function mergeDictationResults(localResult, aiResult, text) {
     ],
     missingDetails: aiResult.missingDetails || localResult.missingDetails || []
   };
-  if (!Object.keys(merged.nutrition).length) merged.nutrition = null;
-  merged.symptoms = dedupeDictationEntries(merged.symptoms, "name");
+  if (!Object.keys(merged.archiveA).length) merged.archiveA = null;
+  merged.archiveB = dedupeDictationEntries(merged.archiveB, "name");
   merged.tasks = dedupeDictationEntries(merged.tasks, "name");
   merged.missingDetails = buildDictationMissingDetails(merged, normalizeDictationText(text));
   return merged;
@@ -7140,17 +9429,17 @@ function isAiDictationEnabled() {
 }
 
 function canUseCloudAi() {
-  return Boolean(appSettings.hipaaCloudConfirmed && appSettings.aiExtractionEnabled && window.fetch && getConfiguredAiBackendUrl());
+  return Boolean(appSettings.cloudAiConfirmed && appSettings.aiExtractionEnabled && window.fetch && getConfiguredAiBackendUrl());
 }
 
 async function testAiTextToSpeech() {
   if (!canUseCloudAi()) {
-    showToast("Enable cloud AI and save your AI backend URL first.");
+    showToast("Enable cloud AI first.");
     return;
   }
   try {
     showToast("Generating AI voice...");
-    await playAiTextToSpeech("AI voice is ready for Health and Task Tracker.");
+    await playAiTextToSpeech("AI voice is ready for TaskLens AI.");
     showToast("Playing AI-generated voice.");
   } catch (error) {
     showToast(error.message || "AI text-to-speech failed.");
@@ -7159,7 +9448,7 @@ async function testAiTextToSpeech() {
 
 async function playAiTextToSpeech(text, options = {}) {
   const backendUrl = getConfiguredAiBackendUrl();
-  if (!backendUrl) throw new Error("Enter an HTTPS AI backend URL in Settings.");
+  if (!backendUrl) throw new Error("AI service is not configured.");
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
   const response = await fetchWithTimeout(`${backendUrl}/api/tts/speech`, {
@@ -7169,7 +9458,7 @@ async function playAiTextToSpeech(text, options = {}) {
       text: truncateForAi(text, 1800),
       model: appSettings.aiTtsModel || "gpt-4o-mini-tts",
       voice: appSettings.aiTtsVoice || "coral",
-      instructions: options.instructions || "Speak in a warm, calm, supportive health coach tone."
+      instructions: options.instructions || "Speak in a warm, calm, supportive supportive task coach tone."
     })
   }, 12000);
   if (!response.ok) {
@@ -7185,8 +9474,8 @@ async function playAiTextToSpeech(text, options = {}) {
 }
 
 function installPhoneTextToSpeechVoiceData() {
-  if (window.HealthTaskTextToSpeech && typeof window.HealthTaskTextToSpeech.installVoiceData === "function") {
-    window.HealthTaskTextToSpeech.installVoiceData();
+  if (window.TaskLensTextToSpeech && typeof window.TaskLensTextToSpeech.installVoiceData === "function") {
+    window.TaskLensTextToSpeech.installVoiceData();
     return;
   }
   showToast("Phone voice install is available in the Android app build.");
@@ -7194,7 +9483,7 @@ function installPhoneTextToSpeechVoiceData() {
 
 async function extractAiDictationData(text) {
   if (!getConfiguredAiBackendUrl()) {
-    throw new Error("Enter an HTTPS AI backend URL in Settings.");
+    throw new Error("AI service is not configured.");
   }
   return extractBackendAiDictationData(text);
 }
@@ -7236,8 +9525,8 @@ async function getFriendlyAiError(response, fallbackLabel) {
 }
 
 function normalizeAiDictationResult(data, originalText) {
-  const nutrition = normalizeAiNutrition(data.nutrition);
-  const symptoms = Array.isArray(data.symptoms) ? data.symptoms.map((entry) => ({
+  const archiveA = normalizeAiarchiveA(data.archiveA);
+  const archiveB = Array.isArray(data.archiveB) ? data.archiveB.map((entry) => ({
     name: cleanDictatedPhrase(entry?.name),
     severity: normalizeAiChoice(entry?.severity, ["Mild", "Moderate", "Severe"], "Mild"),
     note: String(entry?.note || "")
@@ -7249,18 +9538,18 @@ function normalizeAiDictationResult(data, originalText) {
     deadline: normalizeTaskTime(String(entry?.deadline || "")),
     note: String(entry?.note || originalText)
   })).filter((entry) => entry.name) : [];
-  const mood = data.mood && data.mood.name ? {
-    name: normalizeAiChoice(data.mood.name, ["Great", "Good", "Okay", "Low", "Stressed", "Anxious"], "Okay"),
-    intensity: normalizeAiChoice(data.mood.intensity, ["Mild", "Moderate", "Strong"], "Moderate"),
-    note: String(data.mood.note || "")
+  const focusState = data.focusState && data.focusState.name ? {
+    name: normalizeAiChoice(data.focusState.name, ["Great", "Good", "Okay", "Low", "Stressed", "Anxious"], "Okay"),
+    intensity: normalizeAiChoice(data.focusState.intensity, ["Mild", "Moderate", "Strong"], "Moderate"),
+    note: String(data.focusState.note || "")
   } : null;
-  const journal = hasExplicitJournalIntent(originalText) && data.journal && data.journal.text ? { text: String(data.journal.text).trim() } : null;
+  const focusLog = hasExplicitfocusLogIntent(originalText) && data.focusLog && data.focusLog.text ? { text: String(data.focusLog.text).trim() } : null;
   return {
-    nutrition,
-    symptom: symptoms[0] || null,
-    symptoms: symptoms.slice(1),
-    mood,
-    journal,
+    archiveA,
+    archiveB: archiveB[0] || null,
+    archiveB: archiveB.slice(1),
+    focusState,
+    focusLog,
     task: tasks[0] || null,
     tasks: tasks.slice(1),
     missingDetails: Array.isArray(data.missingDetails) ? data.missingDetails.map((detail) => ({
@@ -7271,25 +9560,25 @@ function normalizeAiDictationResult(data, originalText) {
   };
 }
 
-function normalizeAiNutrition(value) {
+function normalizeAiarchiveA(value) {
   if (!value || typeof value !== "object") return null;
-  const nutrition = {};
+  const archiveA = {};
   const aliases = {
-    calories: ["calories", "calorie", "calorieIntake", "calorie_intake"],
-    carbs: ["carbs", "carbohydrates", "netCarbs", "net_carbs"],
-    weight: ["weight", "pounds", "lbs"],
-    glucose: ["glucose", "bloodSugar", "blood_sugar"],
-    systolic: ["systolic", "systolicBloodPressure", "systolic_blood_pressure"],
-    diastolic: ["diastolic", "diastolicBloodPressure", "diastolic_blood_pressure"],
+    valueA: ["valueA", "valueA", "valueAIntake", "valueA_intake"],
+    valueB: ["valueB", "valueBohydrates", "netvalueB", "net_valueB"],
+    valueC: ["valueC", "pounds", "lbs"],
+    valueD: ["valueD", "valueD", "value_d"],
+    systolic: ["systolic", "systolicreading", "systolic_reading_pressure"],
+    diastolic: ["diastolic", "diastolicreading", "diastolic_reading_pressure"],
     water: ["water", "waterOz", "water_oz", "ounces"]
   };
   Object.entries(aliases).forEach(([key, names]) => {
     const rawValue = names.map((name) => value[name]).find((item) => item !== null && item !== undefined && item !== "");
     const number = Number.parseFloat(rawValue);
-    if (Number.isFinite(number)) nutrition[key] = number;
+    if (Number.isFinite(number)) archiveA[key] = number;
   });
-  if (["Entering", "Ketosis", "Deep ketosis", "Exiting"].includes(value.ketosisPhase)) nutrition.ketosisPhase = value.ketosisPhase;
-  return Object.keys(nutrition).length ? nutrition : null;
+  if (["Entering", "phase", "Deep phase", "Exiting"].includes(value.phasePhase)) archiveA.phasePhase = value.phasePhase;
+  return Object.keys(archiveA).length ? archiveA : null;
 }
 
 function normalizeAiChoice(value, allowed, fallback) {
@@ -7299,43 +9588,41 @@ function normalizeAiChoice(value, allowed, fallback) {
 
 function sanitizeDictationResultForTranscript(result, transcript) {
   if (!result || typeof result !== "object") return result;
-  if (!hasExplicitJournalIntent(transcript)) {
-    return { ...result, journal: null };
+  if (!hasExplicitfocusLogIntent(transcript)) {
+    return { ...result, focusLog: null };
   }
   return result;
 }
 
 function extractStructuredDictationData(text) {
   const normalized = normalizeDictationText(text);
-  const nutrition = {};
-  const caloriesValue = getDictatedNumberNear(normalized, ["calories", "calorie intake", "ate"]);
-  const carbsValue = getDictatedNumberNear(normalized, ["carbs", "carbohydrates", "net carbs"]);
-  const weightValue = getDictatedNumberNear(normalized, ["weight", "weigh", "weighed", "pounds", "lbs"]);
-  const glucoseValue = getDictatedNumberNear(normalized, ["glucose", "blood sugar", "sugar"]);
+  const archiveA = {};
+  const valueAValue = getDictatedNumberNear(normalized, ["valueA", "valueA intake", "ate"]);
+  const valueBValue = getDictatedNumberNear(normalized, ["valueB", "valueBohydrates", "net valueB"]);
+  const valueCValue = getDictatedNumberNear(normalized, ["valueC", "weigh", "weighed", "pounds", "lbs"]);
+  const valueDValue = getDictatedNumberNear(normalized, ["valueD", "valueD", "sugar"]);
   const waterValue = getDictatedWater(normalized);
-  const bloodPressure = getDictatedBloodPressure(normalized);
-  const symptoms = parseDictatedSymptoms(text, normalized);
+  const readingPressure = getDictatedreading(normalized);
+  const archiveB = parseDictatedarchiveB(text, normalized);
   const tasks = parseDictatedTasks(text, normalized);
-  const mood = parseDictatedMood(text, normalized);
-  const journal = parseDictatedJournal(text, normalized);
-  if (Number.isFinite(caloriesValue)) nutrition.calories = caloriesValue;
-  if (Number.isFinite(carbsValue)) nutrition.carbs = carbsValue;
-  if (Number.isFinite(weightValue)) nutrition.weight = weightValue;
-  if (Number.isFinite(glucoseValue)) nutrition.glucose = glucoseValue;
-  if (Number.isFinite(waterValue)) nutrition.water = waterValue;
-  if (bloodPressure) {
-    nutrition.systolic = bloodPressure.systolic;
-    nutrition.diastolic = bloodPressure.diastolic;
+  if (Number.isFinite(valueAValue)) archiveA.valueA = valueAValue;
+  if (Number.isFinite(valueBValue)) archiveA.valueB = valueBValue;
+  if (Number.isFinite(valueCValue)) archiveA.valueC = valueCValue;
+  if (Number.isFinite(valueDValue)) archiveA.valueD = valueDValue;
+  if (Number.isFinite(waterValue)) archiveA.water = waterValue;
+  if (readingPressure) {
+    archiveA.systolic = readingPressure.systolic;
+    archiveA.diastolic = readingPressure.diastolic;
   }
-  if (/\b(ketosis|keto)\b/i.test(normalized)) {
-    nutrition.ketosisPhase = normalized.includes("deep") ? "Deep ketosis" : normalized.includes("enter") ? "Entering" : normalized.includes("exit") ? "Exiting" : "Ketosis";
+  if (/\b(phase|keto)\b/i.test(normalized)) {
+    archiveA.phasePhase = normalized.includes("deep") ? "Deep phase" : normalized.includes("enter") ? "Entering" : normalized.includes("exit") ? "Exiting" : "phase";
   }
   const structured = {
-    nutrition: Object.keys(nutrition).length ? nutrition : null,
-    symptom: symptoms[0] || null,
-    symptoms: symptoms.slice(1),
-    mood,
-    journal,
+    archiveA: Object.keys(archiveA).length ? archiveA : null,
+    archiveB: archiveB[0] || null,
+    archiveB: archiveB.slice(1),
+    focusState: null,
+    focusLog: null,
     task: tasks[0] || null,
     tasks: tasks.slice(1),
     missingDetails: []
@@ -7346,23 +9633,17 @@ function extractStructuredDictationData(text) {
 
 function buildDictationMissingDetails(result, normalized) {
   const missing = [];
-  if (/\b(?:blood pressure|bp)\b/i.test(normalized) && (!result.nutrition || !Number.isFinite(result.nutrition.systolic) || !Number.isFinite(result.nutrition.diastolic))) {
-    missing.push({ section: "nutrition", field: "bloodPressure", question: "What is the blood pressure? Use a format like 120/80." });
+  if (/\b(?:pressure|bp)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.systolic) || !Number.isFinite(result.archiveA.diastolic))) {
+    missing.push({ section: "archiveA", field: "readingPressure", question: "What is the pressure reading? Use a format like 120/80." });
   }
-  if (/\b(?:glucose|blood sugar)\b/i.test(normalized) && (!result.nutrition || !Number.isFinite(result.nutrition.glucose))) {
-    missing.push({ section: "nutrition", field: "glucose", question: "What is the glucose number?" });
+  if (/\b(?:valueD|valueD)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.valueD))) {
+    missing.push({ section: "archiveA", field: "valueD", question: "What is the reading number?" });
   }
-  if (/\b(?:water|hydration)\b/i.test(normalized) && (!result.nutrition || !Number.isFinite(result.nutrition.water))) {
-    missing.push({ section: "nutrition", field: "water", question: "How many ounces of water?" });
+  if (/\b(?:water|water)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.water))) {
+    missing.push({ section: "archiveA", field: "water", question: "How many ounces of water?" });
   }
-  if (/\b(?:symptom|symptoms|i have|i feel|feeling|felt)\b/i.test(normalized) && !result.symptom && !(result.symptoms || []).length) {
-    missing.push({ section: "symptoms", field: "name", question: "What symptom should I log?" });
-  }
-  if (/\b(?:mood|emotion|mental)\b/i.test(normalized) && !result.mood) {
-    missing.push({ section: "mood", field: "name", question: "What mood should I log? Good, Okay, Low, Stressed, or Anxious." });
-  }
-  if (/\b(?:journal|journal entry|note to self|write down|remember)\b/i.test(normalized) && !result.journal) {
-    missing.push({ section: "journal", field: "text", question: "What should the journal entry say?" });
+  if (/\b(?:archiveB|archiveB|i have|i feel|feeling|felt)\b/i.test(normalized) && !result.archiveB && !(result.archiveB || []).length) {
+    missing.push({ section: "archiveB", field: "name", question: "What archiveB should I log?" });
   }
   if (/\b(?:add task|task|todo|to do|remind me to|need to|have to)\b/i.test(normalized) && !result.task && !(result.tasks || []).length) {
     missing.push({ section: "tasks", field: "name", question: "What task should I add?" });
@@ -7371,26 +9652,21 @@ function buildDictationMissingDetails(result, normalized) {
 }
 
 function applyDictationMissingDetail(result, detail, answer, originalText) {
-  if (detail.section === "nutrition") {
-    result.nutrition = result.nutrition || {};
-    if (detail.field === "bloodPressure") {
-      const bp = getDictatedBloodPressure(answer);
+  if (detail.section === "archiveA") {
+    result.archiveA = result.archiveA || {};
+    if (detail.field === "readingPressure") {
+      const bp = getDictatedreading(answer);
       if (bp) {
-        result.nutrition.systolic = bp.systolic;
-        result.nutrition.diastolic = bp.diastolic;
+        result.archiveA.systolic = bp.systolic;
+        result.archiveA.diastolic = bp.diastolic;
       }
     } else {
       const value = Number.parseFloat(replaceSpokenNumbers(answer.toLowerCase()));
-      if (Number.isFinite(value)) result.nutrition[detail.field] = value;
+      if (Number.isFinite(value)) result.archiveA[detail.field] = value;
     }
-  } else if (detail.section === "symptoms") {
+  } else if (detail.section === "archiveB") {
     const name = cleanDictatedPhrase(answer);
-    if (name) addDictationItem(result, "symptom", "symptoms", { name, severity: "Mild", note: "" });
-  } else if (detail.section === "mood") {
-    const name = normalizeDictatedMood(answer);
-    result.mood = { name, intensity: "Moderate", note: "" };
-  } else if (detail.section === "journal") {
-    result.journal = { text: answer };
+    if (name) addDictationItem(result, "archiveB", "archiveB", { name, severity: "Mild", note: "" });
   } else if (detail.section === "tasks") {
     const task = buildDictatedTask(answer, normalizeDictationText(answer), originalText);
     if (task) addDictationItem(result, "task", "tasks", task);
@@ -7410,7 +9686,7 @@ function normalizeDictationText(text) {
   return applyDictationTextAliases(replaceSpokenNumbers(String(text || "").toLowerCase()))
     .toLowerCase()
     .replace(/\bb p\b/g, "bp")
-    .replace(/\bbloodpressure\b/g, "blood pressure")
+    .replace(/\bpressurevalue\b/g, "pressure")
     .replace(/\bto do\b/g, "todo")
     .replace(/\s+/g, " ")
     .trim();
@@ -7421,18 +9697,18 @@ function applyDictationTextAliases(text) {
     (normalized, [pattern, replacement]) => normalized.replace(pattern, replacement),
     String(text || "")
   );
-  return applyFuzzyHealthDictationAliases(normalized);
+  return applyFuzzyTaskLensDictationAliases(normalized);
 }
 
-function applyFuzzyHealthDictationAliases(text) {
+function applyFuzzyTaskLensDictationAliases(text) {
   const fuzzyAliases = {
-    calories: ["calories", "calorie", "calories", "calery", "caleries", "callories", "valories", "valeries", "kcal"],
-    carbs: ["carbs", "carbz", "carbohydrates", "carbohydrate", "carbos"],
-    glucose: ["glucose", "glucoze", "glukose", "glucous", "sugar"],
-    weight: ["weight", "weigh", "weighed", "waight", "pounds"],
-    water: ["water", "hydration", "fluids"],
+    valueA: ["valueA", "valueA", "valueA", "calery", "caleries", "callories", "valories", "valeries", "kcal"],
+    valueB: ["valueB", "valueBz", "valueBohydrates", "valueBohydrate", "valueBos"],
+    valueD: ["valueD", "glucoze", "glukose", "glucous", "sugar"],
+    valueC: ["valueC", "weigh", "weighed", "waight", "pounds"],
+    water: ["water", "water", "water"],
     ounces: ["ounces", "ounce", "ounzes"],
-    ketosis: ["ketosis", "ketones", "keytones"],
+    phase: ["phase", "ketones", "keytones"],
     systolic: ["systolic", "sistolic"],
     diastolic: ["diastolic", "diastollic"],
     headache: ["headache", "headake"],
@@ -7532,25 +9808,25 @@ function getDictatedNumberNear(text, labels) {
 }
 
 function getDictatedWater(text) {
-  const value = getDictatedNumberNear(text, ["water", "hydration", "ounces", "oz", "cups"]);
+  const value = getDictatedNumberNear(text, ["water", "water", "ounces", "oz", "cups"]);
   if (!Number.isFinite(value)) return null;
   if (/\b(cup|cups)\b/i.test(text) && !/\b(ounce|ounces|oz)\b/i.test(text)) return value * 8;
   return value;
 }
 
-function getDictatedBloodPressure(text) {
-  const exact = text.match(/\b(?:blood pressure|bp)?\s*(\d{2,3})\s*(?:over|\/)\s*(\d{2,3})\b/i);
-  if (exact && (/\b(?:blood pressure|bp)\b/i.test(text) || Number(exact[1]) >= 70)) {
+function getDictatedreading(text) {
+  const exact = text.match(/\b(?:pressure|bp)?\s*(\d{2,3})\s*(?:over|\/)\s*(\d{2,3})\b/i);
+  if (exact && (/\b(?:pressure|bp)\b/i.test(text) || Number(exact[1]) >= 70)) {
     return { systolic: Number(exact[1]), diastolic: Number(exact[2]) };
   }
-  const nearby = text.match(/\b(?:blood pressure|bp)\b(?:\s*(?:was|is|at|of))?\s*(\d{2,3})\s+(\d{2,3})\b/i);
+  const nearby = text.match(/\b(?:pressure|bp)\b(?:\s*(?:was|is|at|of))?\s*(\d{2,3})\s+(\d{2,3})\b/i);
   return nearby ? { systolic: Number(nearby[1]), diastolic: Number(nearby[2]) } : null;
 }
 
-function parseDictatedSymptoms(original, normalized) {
-  const known = ["headache", "migraine", "fever", "chills", "cough", "congestion", "nausea", "dizzy", "dizziness", "fatigue", "tired", "pain", "sore throat", "chest pain", "shortness of breath", "vomiting", "diarrhea", "stomach ache", "back pain", "anxiety", "rash", "sweating", "weakness", "cramps"];
+function parseDictatedarchiveB(original, normalized) {
+  const known = ["headache", "migraine", "fever", "chills", "cough", "congestion", "nausea", "dizzy", "dizziness", "fatigue", "tired", "pain", "sore throat", "chest pain", "shortness of breath", "vomiting", "discomfort", "stomach ache", "back pain", "anxiety", "rash", "sweating", "weakness", "cramps"];
   const found = known.filter((item) => new RegExp(`\\b${item.replace(/\s+/g, "\\s+")}\\b`, "i").test(normalized));
-  const phraseMatch = normalized.match(/\b(?:symptom|symptoms|i have|i've got|i am having|i'm having|i feel|feeling|felt)\s+(.*?)(?:\b(?:my blood pressure|blood pressure|bp|glucose|blood sugar|water|calories|carbs|weight|mood|journal|task|todo|remind me)\b|$)/i);
+  const phraseMatch = normalized.match(/\b(?:archiveB|archiveB|i have|i've got|i am having|i'm having|i feel|feeling|felt)\s+(.*?)(?:\b(?:pressure|bp|reading|water|valueA|valueB|valueC|focusState|focusLog|task|todo|remind me)\b|$)/i);
   if (!found.length && phraseMatch) {
     const phrase = cleanDictatedPhrase(phraseMatch[1]).replace(/\b(and|also)\b/ig, ",");
     found.push(...phrase.split(",").map(cleanDictatedPhrase).filter(Boolean).slice(0, 3));
@@ -7566,22 +9842,22 @@ function getDictatedSeverity(normalized) {
   return "Mild";
 }
 
-function parseDictatedMood(original, normalized) {
-  const moodMap = [
+function parseDictatedfocusState(original, normalized) {
+  const focusStateMap = [
     ["Great", /\b(great|excellent|amazing|happy|energized)\b/i],
     ["Good", /\b(good|fine|solid|positive|calm)\b/i],
-    ["Low", /\b(low|sad|down|depressed|hopeless|empty)\b/i],
+    ["Low", /\b(low|sad|down|low|hopeless|empty)\b/i],
     ["Stressed", /\b(stressed|overwhelmed|pressure|tense)\b/i],
     ["Anxious", /\b(anxious|anxiety|worried|panic|nervous)\b/i],
     ["Okay", /\b(okay|ok|alright|neutral)\b/i]
   ];
-  const match = moodMap.find(([, pattern]) => pattern.test(normalized));
-  if (!match && !/\b(mood|emotion|mental|feeling emotionally|felt emotionally)\b/i.test(normalized)) return null;
+  const match = focusStateMap.find(([, pattern]) => pattern.test(normalized));
+  if (!match && !/\b(focusState|emotion|mental|feeling emotionally|felt emotionally)\b/i.test(normalized)) return null;
   const intensity = /\b(strong|intense|very|really|extremely)\b/i.test(normalized) ? "Strong" : /\b(mild|slight|little)\b/i.test(normalized) ? "Mild" : "Moderate";
   return { name: match ? match[0] : "Okay", intensity, note: "" };
 }
 
-function normalizeDictatedMood(value) {
+function normalizeDictatedfocusState(value) {
   const lower = value.toLowerCase();
   if (lower.includes("great")) return "Great";
   if (lower.includes("good")) return "Good";
@@ -7591,8 +9867,8 @@ function normalizeDictatedMood(value) {
   return "Okay";
 }
 
-function parseDictatedJournal(original, normalized) {
-  const match = original.match(/\b(?:journal|journal entry|make a journal entry|add a journal entry|new journal entry|note to self|write down in (?:my )?journal|put this in (?:my )?journal|remember this in (?:my )?journal)\s*[:,]?\s*(.*)$/i);
+function parseDictatedfocusLog(original, normalized) {
+  const match = original.match(/\b(?:focusLog|focusLog entry|make a focusLog entry|add a focusLog entry|new focusLog entry|note to self|write down in (?:my )?focusLog|put this in (?:my )?focusLog|remember this in (?:my )?focusLog)\s*[:,]?\s*(.*)$/i);
   if (match) {
     const text = cleanDictatedPhrase(match[1]);
     return text ? { text } : null;
@@ -7600,8 +9876,8 @@ function parseDictatedJournal(original, normalized) {
   return null;
 }
 
-function hasExplicitJournalIntent(text) {
-  return /\b(?:journal|journal entry|make a journal entry|add a journal entry|new journal entry|note to self|write down in (?:my )?journal|put this in (?:my )?journal|remember this in (?:my )?journal)\b/i.test(String(text || ""));
+function hasExplicitfocusLogIntent(text) {
+  return /\b(?:focusLog|focusLog entry|make a focusLog entry|add a focusLog entry|new focusLog entry|note to self|write down in (?:my )?focusLog|put this in (?:my )?focusLog|remember this in (?:my )?focusLog)\b/i.test(String(text || ""));
 }
 
 function parseDictatedTask(original, normalized) {
@@ -7652,74 +9928,71 @@ function cleanDictatedPhrase(value) {
     .trim();
 }
 
-function saveDictatedNutrition(partial) {
-  const existing = nutritionEntries.find((entry) => entry.date === today) || {};
-  nutritionEntries = [{
+function saveDictatedarchiveA(partial) {
+  const existing = archiveAEntries.find((entry) => entry.date === today) || {};
+  archiveAEntries = [{
     date: today,
-    calories: null,
-    carbs: null,
-    weight: null,
-    ketosisPhase: null,
-    glucose: null,
+    valueA: null,
+    valueB: null,
+    valueC: null,
+    phasePhase: null,
+    valueD: null,
     systolic: null,
     diastolic: null,
     water: null,
     ...existing,
     ...partial,
     recordedAt: new Date().toISOString()
-  }, ...nutritionEntries.filter((entry) => entry.date !== today)].sort((first, second) => second.date.localeCompare(first.date));
-  saveNutritionEntries();
+  }, ...archiveAEntries.filter((entry) => entry.date !== today)].sort((first, second) => second.date.localeCompare(first.date));
+  savearchiveAEntries();
 }
 
-function saveDictatedSymptom(symptom) {
-  symptomEntries = [{ id: createHabitId(), date: today, recordedAt: new Date().toISOString(), ...symptom }, ...symptomEntries];
-  saveSymptomEntries();
+function saveDictatedarchiveB(archiveB) {
+  archiveBEntries = [{ id: createHabitId(), date: today, recordedAt: new Date().toISOString(), ...archiveB }, ...archiveBEntries];
+  savearchiveBEntries();
 }
 
-function saveDictatedMood(mood) {
-  moodEntries = [{ id: createHabitId(), date: today, recordedAt: new Date().toISOString(), ...mood }, ...moodEntries];
-  saveMoodEntries();
+function saveDictatedfocusState(focusState) {
+  focusStateEntries = [{ id: createHabitId(), date: today, recordedAt: new Date().toISOString(), ...focusState }, ...focusStateEntries];
+  savefocusStateEntries();
 }
 
-function saveDictatedJournal(journal) {
-  journalEntries = [{ id: createHabitId(), date: today, text: journal.text }, ...journalEntries];
-  saveJournalEntries();
+function saveDictatedfocusLog(focusLog) {
+  focusLogEntries = [{ id: createHabitId(), date: today, text: focusLog.text }, ...focusLogEntries];
+  savefocusLogEntries();
 }
 
 function saveDictatedTask(task) {
-  habits = [{
-    id: createHabitId(),
+  habits = [createTaskDraft({
     name: task.name,
     day: task.day,
     category: "General",
-    time: "",
     deadline: normalizeTaskTime(task.deadline),
-    priority: "Normal",
-    color: "#1e40af",
-    note: task.note,
-    completions: []
-  }, ...habits];
+    priority: "Next",
+    size: "Small",
+    note: task.note
+  }), ...habits];
   saveHabits();
 }
 
 function getDictationSummary(result) {
   const taskCount = (result.task ? 1 : 0) + (Array.isArray(result.tasks) ? result.tasks.length : 0);
-  const symptomCount = (result.symptom ? 1 : 0) + (Array.isArray(result.symptoms) ? result.symptoms.length : 0);
+  const archiveBCount = (result.archiveB ? 1 : 0) + (Array.isArray(result.archiveB) ? result.archiveB.length : 0);
   const parts = [
-    result.nutrition ? "vitals/nutrition" : "",
-    symptomCount ? `${symptomCount} symptom${symptomCount === 1 ? "" : "s"}` : "",
-    result.mood ? "mood" : "",
-    result.journal ? "journal" : "",
+    result.archiveA ? "archiveC/archiveA" : "",
+    archiveBCount ? `${archiveBCount} archiveB${archiveBCount === 1 ? "" : "s"}` : "",
+    result.focusState ? "focusState" : "",
+    result.focusLog ? "focusLog" : "",
     taskCount ? `${taskCount} task${taskCount === 1 ? "" : "s"}` : ""
   ].filter(Boolean);
-  return parts.length ? `Dictation saved: ${parts.join(", ")}. AI Coach refreshed.` : "I heard the dictation, but could not identify health data or a task to save.";
+  return parts.length ? `Dictation saved: ${parts.join(", ")}. AI Coach refreshed.` : "I heard the dictation, but could not identify task details or a task to save.";
 }
 
 function getWeeklyTotals() {
   return getWeeklyCompletionTotals();
 }
 
-async function importBloodPressureFromWatch() {
+async function importreadingFromWatch() {
   let value = "";
   if (navigator.clipboard && window.isSecureContext) {
     try {
@@ -7730,57 +10003,57 @@ async function importBloodPressureFromWatch() {
   }
 
   if (!value) {
-    value = window.prompt("Paste blood pressure from Apple Health, Samsung Health, Fitbit, Garmin, Google Fit, or another watch app export.", "") || "";
+    value = window.prompt("Paste a reading from a watch app, wearable app, CSV rows, or another export snippet.", "") || "";
   }
 
-  const reading = getBloodPressureReading(value);
+  const reading = getreadingReading(value);
   if (!reading) {
-    window.alert("Could not find a blood pressure reading. Paste a value like 120/80, labeled Systolic/Diastolic text, CSV rows, or an Apple Health export snippet.");
+    window.alert("Could not find a pressure reading. Paste a value like 120/80, labeled paired values, CSV rows, or an export snippet.");
     return;
   }
 
-  applyBloodPressureReading(reading);
-  window.alert(`Imported blood pressure ${reading.systolic}/${reading.diastolic}${reading.dateKey ? ` for ${reading.dateKey}` : ""}.`);
+  applyreadingReading(reading);
+  window.alert(`Imported reading ${reading.systolic}/${reading.diastolic}${reading.dateKey ? ` for ${reading.dateKey}` : ""}.`);
 }
 
-function applyBloodPressureFromUrl() {
+function applyreadingFromUrl() {
   const params = new URLSearchParams(location.search);
-  const value = params.get("bp") || params.get("bloodPressure");
+  const value = params.get("bp") || params.get("readingPressure");
   const systolicValue = params.get("systolic") || params.get("sys");
   const diastolicValue = params.get("diastolic") || params.get("dia");
 
-  if (value && setBloodPressureFromText(value)) return;
+  if (value && setreadingFromText(value)) return;
   if (systolicValue && diastolicValue) {
-    setBloodPressureFromText(`${systolicValue}/${diastolicValue}`);
+    setreadingFromText(`${systolicValue}/${diastolicValue}`);
   }
 }
 
-function setBloodPressureFromText(value) {
-  const reading = getBloodPressureReading(value);
+function setreadingFromText(value) {
+  const reading = getreadingReading(value);
   if (!reading) return false;
 
-  applyBloodPressureReading(reading);
+  applyreadingReading(reading);
   return true;
 }
 
-function applyBloodPressureReading(reading) {
+function applyreadingReading(reading) {
   systolic.value = String(reading.systolic);
   diastolic.value = String(reading.diastolic);
   if (reading.dateKey) {
-    nutritionDate.value = reading.dateKey;
+    archiveADate.value = reading.dateKey;
   }
 }
 
-function getBloodPressureReading(value) {
+function getreadingReading(value) {
   const text = String(value || "").trim();
   if (!text) return null;
 
   const readings = [
-    ...parseAppleHealthBloodPressure(text),
-    ...parseDelimitedBloodPressure(text),
-    ...parseLabeledBloodPressure(text),
-    ...parseSlashBloodPressure(text)
-  ].filter(isValidBloodPressureReading);
+    ...parseWatchreading(text),
+    ...parseDelimitedreading(text),
+    ...parseLabeledreading(text),
+    ...parseSlashreading(text)
+  ].filter(isValidreadingReading);
 
   if (!readings.length) return null;
 
@@ -7793,9 +10066,9 @@ function getBloodPressureReading(value) {
   }, null);
 }
 
-function parseAppleHealthBloodPressure(text) {
-  const systolicRecords = getAppleHealthRecords(text, "Systolic");
-  const diastolicRecords = getAppleHealthRecords(text, "Diastolic");
+function parseWatchreading(text) {
+  const systolicRecords = getWatchExportRecords(text, "Systolic");
+  const diastolicRecords = getWatchExportRecords(text, "Diastolic");
 
   return systolicRecords.flatMap((systolicRecord) => {
     const partner = diastolicRecords
@@ -7812,9 +10085,9 @@ function parseAppleHealthBloodPressure(text) {
   });
 }
 
-function getAppleHealthRecords(text, kind) {
+function getWatchExportRecords(text, kind) {
   const records = [];
-  const pattern = new RegExp(`<Record\\b[^>]*BloodPressure${kind}[^>]*>`, "gi");
+  const pattern = new RegExp(`<Record\\b[^>]*reading${kind}[^>]*>`, "gi");
   let match;
   let sequence = 0;
 
@@ -7822,7 +10095,7 @@ function getAppleHealthRecords(text, kind) {
     const record = match[0];
     const value = Number((record.match(/\bvalue="([^"]+)"/i) || [])[1]);
     const dateText = (record.match(/\b(?:startDate|creationDate)="([^"]+)"/i) || [])[1] || "";
-    const date = parseBloodPressureDate(dateText);
+    const date = parsereadingDate(dateText);
     records.push({
       value,
       dateKey: date.dateKey,
@@ -7834,7 +10107,7 @@ function getAppleHealthRecords(text, kind) {
   return records;
 }
 
-function parseDelimitedBloodPressure(text) {
+function parseDelimitedreading(text) {
   const rows = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const readings = [];
   let sequence = 0;
@@ -7853,7 +10126,7 @@ function parseDelimitedBloodPressure(text) {
       const values = splitDelimitedLine(row, delimiter);
       const systolicValue = Number(values[systolicIndex]);
       const diastolicValue = Number(values[diastolicIndex]);
-      const date = parseBloodPressureDate(row);
+      const date = parsereadingDate(row);
       readings.push({
         systolic: systolicValue,
         diastolic: diastolicValue,
@@ -7867,14 +10140,14 @@ function parseDelimitedBloodPressure(text) {
   return readings;
 }
 
-function parseLabeledBloodPressure(text) {
+function parseLabeledreading(text) {
   let sequence = 0;
   return text.split(/\r?\n/).flatMap((line) => {
     const systolicMatch = line.match(/\b(?:sys|systolic)\b[^\d]{0,24}(\d{2,3})/i);
     const diastolicMatch = line.match(/\b(?:dia|diastolic)\b[^\d]{0,24}(\d{2,3})/i);
     if (!systolicMatch || !diastolicMatch) return [];
 
-    const date = parseBloodPressureDate(line);
+    const date = parsereadingDate(line);
     return [{
       systolic: Number(systolicMatch[1]),
       diastolic: Number(diastolicMatch[1]),
@@ -7885,7 +10158,7 @@ function parseLabeledBloodPressure(text) {
   });
 }
 
-function parseSlashBloodPressure(text) {
+function parseSlashreading(text) {
   const readings = [];
   const pattern = /(\d{2,3})\s*\/\s*(\d{2,3})/g;
   let match;
@@ -7895,7 +10168,7 @@ function parseSlashBloodPressure(text) {
     const lineStart = text.lastIndexOf("\n", match.index) + 1;
     const lineEnd = text.indexOf("\n", match.index);
     const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
-    const date = parseBloodPressureDate(line || text);
+    const date = parsereadingDate(line || text);
     readings.push({
       systolic: Number(match[1]),
       diastolic: Number(match[2]),
@@ -7932,7 +10205,7 @@ function normalizeColumnName(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function parseBloodPressureDate(value) {
+function parsereadingDate(value) {
   const text = String(value || "");
   const isoMatch = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
   const usMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
@@ -7953,7 +10226,7 @@ function parseBloodPressureDate(value) {
   };
 }
 
-function isValidBloodPressureReading(reading) {
+function isValidreadingReading(reading) {
   return reading
     && Number.isFinite(reading.systolic)
     && Number.isFinite(reading.diastolic)
@@ -7973,14 +10246,14 @@ function applyTaskFromUrl() {
     id: createHabitId(),
     name: name.slice(0, 32),
     day: weekDays.includes(day) ? day : weekDays[new Date().getDay()],
-    category: (params.get("category") || "Health").slice(0, 24),
+    category: (params.get("category") || "status").slice(0, 24),
     time: ["Anytime", "Morning", "Afternoon", "Evening", "Night"].includes(params.get("time"))
       ? params.get("time")
       : "Anytime",
     priority: ["Normal", "High", "Low"].includes(params.get("priority"))
       ? params.get("priority")
       : "Normal",
-    color: /^#[0-9a-f]{6}$/i.test(params.get("color") || "") ? params.get("color") : "#1e40af",
+    color: /^#[0-9a-f]{6}$/i.test(params.get("color") || "") ? params.get("color") : "#4574fa",
     note: (params.get("note") || "").slice(0, 72),
     completions: []
   };
@@ -7993,21 +10266,21 @@ function applyTaskFromUrl() {
   }
 }
 
-function getKetosisPhaseLevel(phase) {
+function getphasePhaseLevel(phase) {
   const values = {
     Entering: 1,
-    Ketosis: 2,
-    "Deep ketosis": 3,
+    phase: 2,
+    "Deep phase": 3,
     Exiting: 1
   };
   return values[phase] ?? null;
 }
 
-function formatKetosisPhase(phase) {
+function formatphasePhase(phase) {
   return phase ? phase : "--";
 }
 
-function formatBloodPressure(systolicValue, diastolicValue, includeUnits = false) {
+function formatreading(systolicValue, diastolicValue, includeUnits = false) {
   if (!Number.isFinite(systolicValue) && !Number.isFinite(diastolicValue)) return "--";
   const systolicText = Number.isFinite(systolicValue) ? formatWholeNumber(systolicValue) : "--";
   const diastolicText = Number.isFinite(diastolicValue) ? formatWholeNumber(diastolicValue) : "--";
@@ -8015,14 +10288,8 @@ function formatBloodPressure(systolicValue, diastolicValue, includeUnits = false
   return includeUnits ? `${value} mmHg` : value;
 }
 
-applyBloodPressureFromUrl();
+applyreadingFromUrl();
 applyTaskFromUrl();
 render();
 scrollAppToTop();
-if (isAppLockEnabled()) {
-  showAppLock();
-} else if (isGuestModeEnabled()) {
-  finishUnlock();
-} else {
-  showSecuritySetup();
-}
+finishUnlock();

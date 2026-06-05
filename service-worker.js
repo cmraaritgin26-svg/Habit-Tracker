@@ -1,15 +1,17 @@
-const cacheName = "habit-tracker-v196";
+const cacheName = "photofinish-it-v255-photo-upload-fix";
 const assets = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./firebase-config.js",
   "./manifest.webmanifest",
   "./fonts/Quicksand-Regular.ttf",
   "./fonts/Quicksand-Bold.ttf",
-  "./icons/icon.svg",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/tasklens-icon-192.png",
+  "./icons/tasklens-icon-512.png",
+  "./icons/tasklens-header-icon.png",
+  "./icons/tasklens-camera-button.png"
 ];
 
 self.addEventListener("install", (event) => {

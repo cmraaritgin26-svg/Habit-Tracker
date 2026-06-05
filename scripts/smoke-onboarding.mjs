@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 const onboardingSource = readFileSync("src/app-parts/40-storage-settings-onboarding.js", "utf8");
+const bootstrapSource = readFileSync("src/app-parts/00-bootstrap-dom-events.js", "utf8");
 const taskSource = readFileSync("src/app-parts/10-tasks-coach.js", "utf8");
 const reviewSource = readFileSync("src/app-parts/20-review-wellbeing-journal.js", "utf8");
 const html = readFileSync("index.html", "utf8");
@@ -19,13 +20,17 @@ function assertMatches(source, pattern, message) {
 }
 
 assertIncludes(onboardingSource, "function createTaskDraft", "Missing central task draft helper.");
-assertIncludes(onboardingSource, "function getOnboardingState", "Missing centralized onboarding state getter.");
-assertIncludes(onboardingSource, "function saveOnboardingState", "Missing centralized onboarding state saver.");
-assertIncludes(onboardingSource, "input name=\"startingPoint\" type=\"radio\"", "Starting choices must be real radio controls.");
-assertIncludes(onboardingSource, "saveOnboardingState({ startingPoint: input.value })", "Starting choice clicks must save state.");
-assertIncludes(onboardingSource, "Start with a photo", "Photo onboarding CTA should be primary and direct.");
-assertIncludes(onboardingSource, "openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoPhoto: true })", "Onboarding photo path must open the camera/photo picker.");
-assertIncludes(onboardingSource, "getOnboardingStartingContext(onboardingState)", "Photo task must use the selected onboarding context.");
+assertIncludes(onboardingSource, "function shouldShowInitialDataOnboarding", "Missing onboarding gate function.");
+assertIncludes(onboardingSource, "return false;", "Onboarding gate must stay disabled.");
+assertIncludes(onboardingSource, "showDailyAffirmation();", "Unlock should continue into the app without onboarding.");
+if (/id="getStartedButton"|Guided Entry|id="onboardingModal"/.test(html)) {
+  throw new Error("Onboarding UI must not be present in the app shell.");
+}
+assertMatches(
+  bootstrapSource,
+  /getStartedButton\?\.addEventListener\("click", startGuidedDataEntry\);/,
+  "Removed Guided Entry button must not break startup wiring."
+);
 assertIncludes(reviewSource, "currentName.endsWith(\" photo checklist\")", "Contextual photo checklist names must remain renameable.");
 assertIncludes(reviewSource, "buildTaskBreakdownAfterPhotoCard", "Checklist must render the after photo at the end of the steps.");
 assertIncludes(reviewSource, "label.textContent = \"After\"", "After photo heading must be exactly After.");
@@ -34,7 +39,9 @@ assertIncludes(reviewSource, "modal?.body?.isConnected", "After photo rendering 
 assertIncludes(reviewSource, "requestTaskTargetImage", "After picture should be available as an optional manual action.");
 assertIncludes(reviewSource, "getTaskBreakdownAfterImageDataUrl", "After block should render saved after or generated target images.");
 assertIncludes(reviewSource, 'button.textContent = error ? "Try after picture again" : "Make after picture";', "After picture generation must be user-triggered.");
-assertIncludes(reviewSource, "imageDataUrl: String(options.imageDataUrl || \"\").slice(0, 900000)", "Photo checklist uploads must stay small enough to return quickly.");
+assertIncludes(reviewSource, "const imageDataUrl = String(options.imageDataUrl || \"\").slice(0, 900000);", "Photo checklist uploads must stay small enough to return quickly.");
+assertIncludes(reviewSource, "dataUrlToBlob", "Photo checklist uploads must use binary image transport.");
+assertIncludes(reviewSource, "X-Task-Meta", "Photo checklist uploads must send small task metadata separately from the image.");
 if (/Add after photo|Replace after photo|Make target picture|Remake target picture/.test(reviewSource)) {
   throw new Error("Manual after/target picture buttons must not be rendered.");
 }
@@ -43,10 +50,9 @@ assertIncludes(taskSource, "openTaskBreakdownDialog(habit)", "Task card click mu
 if (/task-edit-button|textContent = "Edit"/.test(taskSource)) {
   throw new Error("Task cards must not render a separate Edit button.");
 }
-assertIncludes(styles, ".onboarding-start-choice", "Starting choices need visible control styling.");
 assertIncludes(html, 'class="task-choice-group"', "Task composer dropdowns should render as segmented controls.");
 assertIncludes(taskSource, "function syncTaskChoiceButtons", "Segmented task controls must sync back to hidden select values.");
-assertMatches(html, /TaskLens Premium/, "Premium panel should remain user-facing.");
+assertMatches(html, /PhotoFinish IT Premium/, "Premium panel should remain user-facing.");
 if (/premiumTestToggle|Premium test mode/i.test(html)) {
   throw new Error("Developer premium test controls must not be present in settings markup.");
 }

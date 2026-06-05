@@ -622,6 +622,7 @@ function openTaskBreakdownPrompt(task, options = {}) {
 
   generateButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
   if (options.autoPhoto) modal.issuePhotoInput?.click();
+  if (options.autoGallery) modal.issueGalleryPhotoInput?.click();
 }
 
 function openTaskBreakdownDialog(task) {
@@ -1057,7 +1058,9 @@ function buildTaskBreakdownDetailInput(task, modal) {
   const composer = document.createElement("div");
   const textarea = document.createElement("textarea");
   const photoInput = document.createElement("input");
+  const galleryInput = document.createElement("input");
   const photoButton = document.createElement("button");
+  const galleryButton = document.createElement("button");
   const photoPreview = document.createElement("img");
   const photoAnalysis = document.createElement("p");
   const tools = document.createElement("div");
@@ -1076,17 +1079,27 @@ function buildTaskBreakdownDetailInput(task, modal) {
   photoInput.capture = "environment";
   photoInput.className = "task-breakdown-photo-input";
   photoInput.hidden = true;
+  galleryInput.type = "file";
+  galleryInput.accept = "image/*";
+  galleryInput.className = "task-breakdown-photo-input";
+  galleryInput.hidden = true;
   photoButton.className = "text-button task-breakdown-icon-button";
   photoButton.type = "button";
-  photoButton.textContent = "Add photo";
-  photoButton.setAttribute("aria-label", "Attach a photo for AI");
+  photoButton.textContent = "Take photo";
+  photoButton.setAttribute("aria-label", "Take a photo for AI");
+  galleryButton.className = "text-button task-breakdown-icon-button";
+  galleryButton.type = "button";
+  galleryButton.textContent = "Choose photo";
+  galleryButton.setAttribute("aria-label", "Choose an existing photo for AI");
   photoPreview.className = "task-breakdown-photo-preview";
   photoPreview.alt = "Selected issue photo preview";
   photoPreview.hidden = true;
   photoAnalysis.className = "task-breakdown-photo-analysis";
   photoAnalysis.hidden = true;
   modal.issuePhotoInput = photoInput;
+  modal.issueGalleryPhotoInput = galleryInput;
   modal.issuePhotoButton = photoButton;
+  modal.issueGalleryPhotoButton = galleryButton;
   modal.issuePhotoPreview = photoPreview;
   modal.issuePhotoAnalysis = photoAnalysis;
   modal.issueQuestionInput = textarea;
@@ -1094,10 +1107,12 @@ function buildTaskBreakdownDetailInput(task, modal) {
 
   tools.className = "task-breakdown-tools";
   photoInput.addEventListener("change", () => handleTaskBreakdownPhoto(photoInput, modal));
+  galleryInput.addEventListener("change", () => handleTaskBreakdownPhoto(galleryInput, modal));
   photoButton.addEventListener("click", () => photoInput.click());
+  galleryButton.addEventListener("click", () => galleryInput.click());
 
-  tools.append(photoButton);
-  composer.append(textarea, photoInput);
+  tools.append(photoButton, galleryButton);
+  composer.append(textarea, photoInput, galleryInput);
   wrap.append(photoPreview, photoAnalysis, composer, tools);
   return wrap;
 }
@@ -1126,7 +1141,8 @@ async function handleTaskBreakdownPhoto(input, modal) {
     };
     modal.issuePhotoPreview.src = resized.preview;
     modal.issuePhotoPreview.hidden = false;
-    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Change photo";
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Retake photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose another";
     if (modal.issuePhotoAnalysis) {
       modal.issuePhotoAnalysis.hidden = false;
       modal.issuePhotoAnalysis.textContent = "Photo ready. Submit to build the checklist.";
@@ -1136,7 +1152,8 @@ async function handleTaskBreakdownPhoto(input, modal) {
     modal.issueImagePreviewDataUrl = "";
     modal.issuePhotoTelemetry = null;
     input.value = "";
-    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Add photo";
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Take photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose photo";
     if (modal.issuePhotoAnalysis) {
       modal.issuePhotoAnalysis.hidden = true;
       modal.issuePhotoAnalysis.textContent = "";
@@ -1149,16 +1166,17 @@ async function prepareTaskBreakdownImages(file) {
   const image = await loadTaskBreakdownImageFile(file);
   const preview = renderTaskBreakdownImageDataUrl(image, 640, 0.64);
   const attempts = [
-    [720, 0.58],
-    [600, 0.52],
-    [500, 0.46]
+    [520, 0.46],
+    [420, 0.38],
+    [320, 0.32],
+    [240, 0.28]
   ];
   for (const [maxSide, quality] of attempts) {
     const upload = renderTaskBreakdownImageDataUrl(image, maxSide, quality);
-    if (upload.length <= 650000) return { upload, preview };
+    if (upload.length <= 180000) return { upload, preview };
   }
   return {
-    upload: renderTaskBreakdownImageDataUrl(image, 420, 0.42),
+    upload: renderTaskBreakdownImageDataUrl(image, 240, 0.24),
     preview
   };
 }
@@ -1185,6 +1203,23 @@ function renderTaskBreakdownImageDataUrl(image, maxSide = 1200, quality = 0.82) 
   const context = canvas.getContext("2d", { alpha: false });
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function downscaleTaskBreakdownImageDataUrl(imageDataUrl, maxSide = 420, quality = 0.36) {
+  const source = String(imageDataUrl || "").trim();
+  if (!source.startsWith("data:image/")) return "";
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onerror = () => resolve("");
+    image.onload = () => {
+      try {
+        resolve(renderTaskBreakdownImageDataUrl(image, maxSide, quality));
+      } catch {
+        resolve("");
+      }
+    };
+    image.src = source;
+  });
 }
 
 async function resizeTaskBreakdownImage(file, maxSide = 1200, quality = 0.82) {
@@ -1357,30 +1392,46 @@ function getPhotoAiUsage() {
     const period = getPhotoAiUsagePeriod();
     return {
       period,
-      count: usage?.period === period ? Number(usage.count) || 0 : 0
+      count: usage?.period === period ? Number(usage.count) || 0 : 0,
+      afterCount: usage?.period === period ? Number(usage.afterCount) || 0 : 0
     };
   } catch {
-    return { period: getPhotoAiUsagePeriod(), count: 0 };
+    return { period: getPhotoAiUsagePeriod(), count: 0, afterCount: 0 };
   }
 }
 
 function incrementPhotoAiUsage() {
-  if (appSettings.premiumUnlocked) return;
   const usage = getPhotoAiUsage();
   localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
     period: usage.period,
-    count: Math.min(999, usage.count + 1)
+    count: Math.min(999, usage.count + 1),
+    afterCount: usage.afterCount
+  }));
+}
+
+function incrementAfterImageUsage() {
+  const usage = getPhotoAiUsage();
+  localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
+    period: usage.period,
+    count: usage.count,
+    afterCount: Math.min(999, usage.afterCount + 1)
   }));
 }
 
 function canUsePremiumPhotoAi() {
-  if (appSettings.premiumUnlocked) return true;
+  if (appSettings.premiumUnlocked) return getPhotoAiUsage().count < PREMIUM_PHOTO_AI_LIMIT;
   return getPhotoAiUsage().count < FREE_PHOTO_AI_LIMIT;
 }
 
+function canUseAfterImageAi() {
+  return Boolean(appSettings.premiumUnlocked) && getPhotoAiUsage().afterCount < PREMIUM_AFTER_IMAGE_LIMIT;
+}
+
 function getPhotoAiUsageLabel() {
-  if (appSettings.premiumUnlocked) return "Premium photo AI unlocked.";
   const usage = getPhotoAiUsage();
+  if (appSettings.premiumUnlocked) {
+    return `${Math.max(0, PREMIUM_PHOTO_AI_LIMIT - usage.count)} of ${PREMIUM_PHOTO_AI_LIMIT} premium before-photo checklists and ${Math.max(0, PREMIUM_AFTER_IMAGE_LIMIT - usage.afterCount)} of ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures left this month.`;
+  }
   return `${Math.max(0, FREE_PHOTO_AI_LIMIT - usage.count)} of ${FREE_PHOTO_AI_LIMIT} free photo checklists left this month.`;
 }
 
@@ -1392,7 +1443,7 @@ function showPhotoAiLimitMessage(modal) {
   const textOnlyButton = document.createElement("button");
   const settingsButtonLocal = document.createElement("button");
   message.className = "task-breakdown-status";
-  message.textContent = `You used the ${FREE_PHOTO_AI_LIMIT} free photo checklists for this month. Premium will unlock more photo breakdowns for ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}. Text-only task checklists still work.`;
+  message.textContent = `You used the ${FREE_PHOTO_AI_LIMIT} free photo checklists for this month. Premium includes ${PREMIUM_PHOTO_AI_LIMIT} before-photo checklists and ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures per month for ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}. Text-only task checklists still work.`;
   actions.className = "settings-actions task-breakdown-actions";
   textOnlyButton.className = "primary-button";
   textOnlyButton.type = "button";
@@ -1405,9 +1456,18 @@ function showPhotoAiLimitMessage(modal) {
     modal.issueImagePreviewDataUrl = "";
     generateTaskBreakdown(modal.task, modal);
   });
-  settingsButtonLocal.addEventListener("click", () => settingsButton?.click());
+  settingsButtonLocal.addEventListener("click", () => accountButton?.click());
   actions.append(textOnlyButton, settingsButtonLocal);
   modal.body.append(message, actions);
+}
+
+function showAfterImageLimitMessage() {
+  if (!appSettings.premiumUnlocked) {
+    showToast(`After pictures are included with Premium: ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}.`);
+    accountButton?.click();
+    return;
+  }
+  showToast(`You used all ${PREMIUM_AFTER_IMAGE_LIMIT} Premium after pictures for this month.`);
 }
 
 function getTaskBreakdownErrorMessage(error) {
@@ -1421,37 +1481,105 @@ function getTaskBreakdownErrorMessage(error) {
 async function fetchTaskBreakdown(task, options = {}) {
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
   const backendUrl = getConfiguredAiBackendUrl();
   if (!backendUrl) throw new Error("AI service is not configured.");
-  const response = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      task: {
-        name: task.name,
-        date: getTaskDateKey(task),
-        day: getTaskDay(task),
-        category: task.category,
-        priority: task.priority,
-        size: task.size,
-        deadline: task.deadline,
-        note: task.note,
-        dictationDetails: buildTaskBreakdownContext(task, options),
-        issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
-        imageDataUrl: String(options.imageDataUrl || "").slice(0, 900000)
-      }
-    })
-  }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+  const imageDataUrl = String(options.imageDataUrl || "").slice(0, 900000);
+  const taskPayload = {
+    task: {
+      name: task.name,
+      date: getTaskDateKey(task),
+      day: getTaskDay(task),
+      category: task.category,
+      priority: task.priority,
+      size: task.size,
+      deadline: task.deadline,
+      note: task.note,
+      dictationDetails: buildTaskBreakdownContext(task, options),
+      issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+      imageDataUrl
     }
-    if (response.status === 413) {
-      throw new Error("That photo is too large for the backend. Try a smaller photo.");
-    }
-    throw new Error(await getFriendlyAiError(response, "AI task breakdown"));
+  };
+  const rawPhotoBlob = imageDataUrl ? dataUrlToBlob(imageDataUrl) : null;
+  if (rawPhotoBlob) {
+    delete headers["Content-Type"];
+    headers["X-Task-Meta"] = encodeURIComponent(JSON.stringify({
+      ...taskPayload.task,
+      imageDataUrl: ""
+    }));
+    headers["Content-Type"] = rawPhotoBlob.mime;
   }
-  return normalizeTaskBreakdown(await response.json(), task);
+  try {
+    const response = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+      method: "POST",
+      headers,
+      body: rawPhotoBlob ? rawPhotoBlob.blob : JSON.stringify(taskPayload)
+    }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+      }
+      if (response.status === 413) {
+        throw new Error("That photo is too large for the backend. Try a smaller photo.");
+      }
+      throw new Error(await getFriendlyAiError(response, "AI task breakdown"));
+    }
+    return normalizeTaskBreakdown(await response.json(), task);
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (imageDataUrl && /failed to fetch|networkerror|network error|fetch failed/i.test(message)) {
+      const smallerImageDataUrl = await downscaleTaskBreakdownImageDataUrl(imageDataUrl);
+      if (smallerImageDataUrl && smallerImageDataUrl.length < imageDataUrl.length) {
+        const retryResponse = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task: {
+              name: task.name,
+              date: getTaskDateKey(task),
+              day: getTaskDay(task),
+              category: task.category,
+              priority: task.priority,
+              size: task.size,
+              deadline: task.deadline,
+              note: task.note,
+              dictationDetails: buildTaskBreakdownContext(task, options),
+              issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+              imageDataUrl: smallerImageDataUrl.slice(0, 900000)
+            }
+          })
+        }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+        if (retryResponse.ok) {
+          return normalizeTaskBreakdown(await retryResponse.json(), task);
+        }
+        if (retryResponse.status === 404) {
+          throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+        }
+        if (retryResponse.status === 413) {
+          throw new Error("That photo is too large for the backend. Try a smaller photo.");
+        }
+        throw new Error(await getFriendlyAiError(retryResponse, "AI task breakdown"));
+      }
+    }
+    throw error;
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+  const extension = match[1].toLowerCase().replace("jpeg", "jpg");
+  const mime = extension === "jpg" ? "image/jpeg" : `image/${extension}`;
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return {
+    blob: new Blob([bytes], { type: mime }),
+    mime
+  };
 }
 
 async function fetchTaskTargetImage(task, breakdown) {
@@ -1461,6 +1589,8 @@ async function fetchTaskTargetImage(task, breakdown) {
   if (!imageDataUrl) return null;
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
   const backendUrl = getConfiguredAiBackendUrl();
   if (!backendUrl) throw new Error("AI service is not configured.");
   const response = await fetchWithTimeout(`${backendUrl}/api/tasks/target-image`, {
@@ -1494,6 +1624,17 @@ async function fetchTaskTargetImage(task, breakdown) {
   return targetImageDataUrl.startsWith("data:image/") ? targetImageDataUrl.slice(0, 2200000) : null;
 }
 
+async function getTaskLensAccountIdToken() {
+  try {
+    if (typeof window.TaskLensAuth?.getIdToken === "function") {
+      return String(await window.TaskLensAuth.getIdToken() || "").trim();
+    }
+  } catch {
+    // The backend will return a sign-in error if account enforcement is enabled.
+  }
+  return "";
+}
+
 async function fetchAndSaveTaskTargetImage(task, modal, breakdown) {
   const requestStartedAt = performance.now();
   try {
@@ -1523,6 +1664,7 @@ async function fetchAndSaveTaskTargetImage(task, modal, breakdown) {
       targetImagePending: false
     };
     saveTaskBreakdowns();
+    incrementAfterImageUsage();
     recordPhotoAiTelemetry(task, taskBreakdowns[task.id], targetImageDataUrl ? "after_image_ok" : "after_image_empty");
     if (modal?.body?.isConnected) renderTaskBreakdownSteps(task, modal, taskBreakdowns[task.id]);
     render();
@@ -1572,6 +1714,10 @@ function recordPhotoAiTelemetry(task, breakdown, eventName) {
 function requestTaskTargetImage(task, modal, breakdown) {
   if (!String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")) {
     showToast("Add a before photo first.");
+    return;
+  }
+  if (!canUseAfterImageAi()) {
+    showAfterImageLimitMessage();
     return;
   }
   if (breakdown.targetImagePending) return;

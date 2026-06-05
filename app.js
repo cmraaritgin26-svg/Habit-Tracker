@@ -26,6 +26,8 @@ const focusLogStoreKey = "tasklens-ai:focusLog:v1";
 const deletedfocusLogEntriesStoreKey = "tasklens-ai:focusLog-deleted:v1";
 const dictationDocumentStoreKey = "tasklens-ai:dictation-documents:v1";
 const settingsStoreKey = "tasklens-ai:settings:v1";
+const firebaseAuthStoreKey = "tasklens-ai:firebase-auth:v1";
+const onboardingCompleteStoreKey = "tasklens-ai:onboarding-complete:v2";
 const aiDefaultEnabledStoreKey = "tasklens-ai:ai-default-enabled:v1";
 const backupReminderStoreKey = "tasklens-ai:last-backup-reminder:v1";
 const affirmationShownStoreKey = "tasklens-ai:last-affirmation:v1";
@@ -38,13 +40,15 @@ const AI_TASK_BREAKDOWN_TIMEOUT_MS = 45000;
 const AI_TARGET_IMAGE_TIMEOUT_MS = 120000;
 const AI_SAFETY_SCAN_TIMEOUT_MS = 6000;
 const FREE_PHOTO_AI_LIMIT = 5;
-const PREMIUM_MONTHLY_PRICE = "$4.99/month";
-const PREMIUM_YEARLY_PRICE = "$29.99/year";
+const PREMIUM_PHOTO_AI_LIMIT = 35;
+const PREMIUM_AFTER_IMAGE_LIMIT = 35;
+const PREMIUM_MONTHLY_PRICE = "$5.99/month";
+const PREMIUM_YEARLY_PRICE = "$59.99/year";
 const HISTORY_RETENTION_DAYS = 3650;
 const deadlineAlertStoreKey = "tasklens-ai:deadline-alerts:v1";
 const deadlineEventStoreKey = "tasklens-ai:deadline-events:v1";
 const focusAreaTrendAlertStoreKey = "tasklens-ai:focusArea-trend-alerts:v1";
-const hasSavedSettings = localStorage.getItem(settingsStoreKey) !== null;
+const hasCompletedOnboarding = localStorage.getItem(onboardingCompleteStoreKey) === "true";
 const dailyAffirmations = [
   "My brain does better with one clear next step than a perfect full plan.",
   "Starting small is not lowering the bar; it is building a ramp.",
@@ -108,7 +112,7 @@ const focusLogConcernPatterns = [
   /\b(i disappear|just disappear|wish i could disappear|don't want to exist|do not want to exist|stop existing)\b/i
 ];
 const dictationNormalizationRules = [
-  [/\bb\s*p\b|\bbp\b|\breadingpressure\b|\breading\b|\breading\b/g, "reading pressure"],
+  [/\bb\s*p\b|\bbp\b|\bpressure\b|\bpressure reading\b/g, "pressure"],
   [/\breading suger\b|\breading sug(?:er|ar)\b|\bsuger\b|\bsugar lvl\b|\bsugar level\b|\bbs\b|\bbg\b/g, "valueD"],
   [/\bgluco(?:s|se|ze)\b|\bglucous\b|\bglukose\b|\bglocos\b|\bfinger stick\b/g, "valueD"],
   [/\bcal(?:s|z)?\b|\bcals\b|\bkcal\b|\bvalueA(?:s|z)?\b|\bcalery\b|\bcaleries\b|\bcallories\b|\bvalorie(?:s|z)?\b|\bvaleries\b|\bvallories\b|\bfood energy\b/g, "valueA"],
@@ -150,6 +154,8 @@ let focusStateEntries = loadfocusStateEntries();
 let focusLogEntries = loadfocusLogEntries();
 let dictationDocuments = loadDictationDocuments();
 let appSettings = loadAppSettings();
+let taskLensAuthSession = loadTaskLensAuthSession();
+let pendingAccountAction = "";
 let taskDeadlineEvents = loadTaskDeadlineEvents();
 let editingHabitId = null;
 let lastReminderKey = "";
@@ -318,6 +324,26 @@ const settingsModal = document.querySelector("#settingsModal");
 const settingsPanel = document.querySelector(".settings-panel");
 const settingsClose = document.querySelector("#settingsClose");
 const settingsSearch = document.querySelector("#settingsSearch");
+const accountButton = document.querySelector("#accountButton");
+const accountModal = document.querySelector("#accountModal");
+const accountDialogPanel = document.querySelector(".account-dialog-panel");
+const accountClose = document.querySelector("#accountClose");
+const accountStatus = document.querySelector("#accountStatus");
+const accountAuthFields = document.querySelector("#accountAuthFields");
+const accountEmail = document.querySelector("#accountEmail");
+const accountPassword = document.querySelector("#accountPassword");
+const accountSignInButton = document.querySelector("#accountSignInButton");
+const accountCreateButton = document.querySelector("#accountCreateButton");
+const accountResetPasswordButton = document.querySelector("#accountResetPasswordButton");
+const accountSignOutButton = document.querySelector("#accountSignOutButton");
+const createAccountModal = document.querySelector("#createAccountModal");
+const createAccountClose = document.querySelector("#createAccountClose");
+const createAccountCancel = document.querySelector("#createAccountCancel");
+const createAccountMessage = document.querySelector("#createAccountMessage");
+const createAccountEmail = document.querySelector("#createAccountEmail");
+const createAccountPassword = document.querySelector("#createAccountPassword");
+const createAccountConfirmPassword = document.querySelector("#createAccountConfirmPassword");
+const createAccountSubmitButton = document.querySelector("#createAccountSubmitButton");
 const themeToggle = document.querySelector("#themeToggle");
 const reminderToggle = document.querySelector("#reminderToggle");
 const reminderTime = document.querySelector("#reminderTime");
@@ -455,7 +481,7 @@ if (DICTATION_FEATURE_ENABLED) {
   dictateButton.hidden = true;
   dictationStatus.hidden = true;
 }
-getStartedButton.addEventListener("click", startGuidedDataEntry);
+getStartedButton?.addEventListener("click", startGuidedDataEntry);
 quickActionButtons.forEach((button) => {
   button.addEventListener("click", () => {
     floatingAddMenu?.classList.remove("open");
@@ -502,10 +528,13 @@ taskChoiceButtons.forEach((button) => {
   });
 });
 syncTaskChoiceButtons();
-photoAiHeroButton?.addEventListener("click", startPhotoAiHeroTask);
+photoAiHeroButton?.addEventListener("click", () => {
+  if (!requireTaskLensAccount("photo")) return;
+  startPhotoAiHeroTask();
+});
 brainDumpHeroButton?.addEventListener("click", () => {
-  habitName.focus();
-  habitName.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (!requireTaskLensAccount("brain")) return;
+  startBrainDumpHeroTask();
 });
 winsPanel?.addEventListener("click", () => scrollToTaskList());
 winsPanel?.addEventListener("keydown", (event) => {
@@ -890,6 +919,97 @@ settingsButton?.addEventListener("click", () => {
   openSettingsMenu();
 });
 
+function openAccountMenu() {
+  if (!accountModal || !accountDialogPanel) return;
+  accountModal.hidden = false;
+  accountModal.removeAttribute("hidden");
+  accountModal.style.display = "grid";
+  accountModal.style.zIndex = "9999";
+  accountModal.scrollTop = 0;
+  accountDialogPanel.scrollTop = 0;
+  renderTaskLensAccountSettings();
+  renderSettings();
+  updateDialogScrollLock();
+  if (!taskLensAuthSession?.refreshToken) {
+    setTimeout(() => accountEmail?.focus(), 60);
+  }
+}
+
+window.openTaskLensAccount = openAccountMenu;
+accountButton?.addEventListener("click", openAccountMenu);
+accountClose?.addEventListener("click", () => {
+  accountModal.hidden = true;
+  accountModal.style.display = "";
+  accountModal.style.zIndex = "";
+  updateDialogScrollLock();
+});
+accountModal?.addEventListener("click", (event) => {
+  if (event.target !== accountModal) return;
+  accountModal.hidden = true;
+  accountModal.style.display = "";
+  accountModal.style.zIndex = "";
+  updateDialogScrollLock();
+});
+
+function openCreateAccountDialog() {
+  if (!createAccountModal) return;
+  createAccountModal.hidden = false;
+  createAccountModal.removeAttribute("hidden");
+  createAccountModal.style.display = "grid";
+  createAccountModal.style.zIndex = "10000";
+  createAccountModal.scrollTop = 0;
+  if (createAccountMessage) createAccountMessage.textContent = "Create your account, then sign in to continue.";
+  if (createAccountEmail && accountEmail?.value) createAccountEmail.value = accountEmail.value;
+  if (createAccountPassword) createAccountPassword.value = "";
+  if (createAccountConfirmPassword) createAccountConfirmPassword.value = "";
+  updateDialogScrollLock();
+  setTimeout(() => (createAccountEmail?.value ? createAccountPassword : createAccountEmail)?.focus(), 60);
+}
+
+function closeCreateAccountDialog() {
+  if (!createAccountModal) return;
+  createAccountModal.hidden = true;
+  createAccountModal.style.display = "";
+  createAccountModal.style.zIndex = "";
+  updateDialogScrollLock();
+}
+
+createAccountClose?.addEventListener("click", closeCreateAccountDialog);
+createAccountCancel?.addEventListener("click", closeCreateAccountDialog);
+createAccountModal?.addEventListener("click", (event) => {
+  if (event.target !== createAccountModal) return;
+  closeCreateAccountDialog();
+});
+
+function isTaskLensAccountSignedIn() {
+  return Boolean(taskLensAuthSession?.refreshToken);
+}
+
+function requireTaskLensAccount(actionName) {
+  if (isTaskLensAccountSignedIn()) return true;
+  pendingAccountAction = actionName || "";
+  openAccountMenu();
+  showToast("Sign in or create an account to continue.");
+  return false;
+}
+
+function runPendingAccountAction() {
+  const action = pendingAccountAction;
+  pendingAccountAction = "";
+  if (action === "photo") {
+    startPhotoAiHeroTask();
+    return;
+  }
+  if (action === "brain") {
+    startBrainDumpHeroTask();
+  }
+}
+
+function startBrainDumpHeroTask() {
+  habitName.focus();
+  habitName.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 settingsClose?.addEventListener("click", () => {
   settingsModal.hidden = true;
   settingsModal.style.display = "";
@@ -907,6 +1027,17 @@ settingsModal?.addEventListener("click", (event) => {
 });
 settingsSearch?.addEventListener("input", filterSettings);
 
+accountSignInButton?.addEventListener("click", () => signInTaskLensAccount());
+accountCreateButton?.addEventListener("click", openCreateAccountDialog);
+createAccountSubmitButton?.addEventListener("click", () => createTaskLensAccount());
+accountResetPasswordButton?.addEventListener("click", () => sendTaskLensPasswordReset());
+accountSignOutButton?.addEventListener("click", signOutTaskLensAccount);
+accountPassword?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") signInTaskLensAccount();
+});
+createAccountConfirmPassword?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") createTaskLensAccount();
+});
 themeToggle?.addEventListener("change", () => updateSetting("theme", themeToggle.checked ? "dark" : "light"));
 reminderToggle?.addEventListener("change", () => updateSetting("remindersEnabled", reminderToggle.checked));
 reminderTime?.addEventListener("change", () => updateSetting("reminderTime", reminderTime.value));
@@ -974,6 +1105,13 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape" && !settingsModal.hidden) {
     settingsModal.hidden = true;
+  }
+  if (event.key === "Escape" && createAccountModal && !createAccountModal.hidden) {
+    closeCreateAccountDialog();
+    return;
+  }
+  if (event.key === "Escape" && accountModal && !accountModal.hidden) {
+    accountModal.hidden = true;
   }
 });
 
@@ -1384,7 +1522,7 @@ function renderTodayDashboard() {
   }
   if (todayarchiveCSummary) {
     todayarchiveCSummary.textContent = latestEntry
-      ? [formatreading(latestEntry.systolic, latestEntry.diastolic), Number.isFinite(latestEntry.valueD) ? `${formatWholeNumber(latestEntry.valueD)} valueD` : ""].filter((value) => value && value !== "--").join(" / ") || "--"
+      ? [formatreading(latestEntry.systolic, latestEntry.diastolic), Number.isFinite(latestEntry.valueD) ? `${formatWholeNumber(latestEntry.valueD)} reading` : ""].filter((value) => value && value !== "--").join(" / ") || "--"
       : "--";
   }
   if (todayfocusStateSummary) todayfocusStateSummary.textContent = todayfocusState ? todayfocusState.name : "--";
@@ -1564,7 +1702,7 @@ function getSmartCoachInsights() {
   const latestarchiveB = archiveBEntries[0];
   const waterGoal = getDailyWaterGoal();
   const waterAmount = latestEntry && latestEntry.date === today && Number.isFinite(latestEntry.water) ? latestEntry.water : 0;
-  const supportPatternInsight = getsupportPatternInsight();
+  const signalPatternInsight = getSignalPatternInsight();
   const insights = [];
 
   if (!todayTasks.length) {
@@ -1608,24 +1746,24 @@ function getSmartCoachInsights() {
 
   if (latestarchiveB && ["Moderate", "Severe"].includes(latestarchiveB.severity)) {
     insights.push({
-      title: "archiveB-aware pacing",
-      body: `${latestarchiveB.severity} ${latestarchiveB.name.toLowerCase()} is in your recent archiveB log. Lower intensity tasks make more sense right now.`,
+      title: "Issue-aware pacing",
+      body: `${latestarchiveB.severity} ${latestarchiveB.name.toLowerCase()} is in your recent issue log. Lower intensity tasks make more sense right now.`,
       tone: "care",
       destination: "archiveB",
-      actionLabel: "Go to archiveB"
+      actionLabel: "Go to issues"
     });
   }
 
   if (latestEntry && (latestEntry.systolic >= 130 || latestEntry.diastolic >= 80)) {
     insights.push({
-      title: "archiveC watch",
-      body: `Latest reading pressure is ${formatreading(latestEntry.systolic, latestEntry.diastolic)}. Keep tracking it consistently and avoid treating one reading like the whole story.`,
+      title: "Signal watch",
+      body: `Latest pressure reading is ${formatreading(latestEntry.systolic, latestEntry.diastolic)}. Keep tracking it consistently and avoid treating one reading like the whole story.`,
       tone: "support"
     });
   }
 
-  if (supportPatternInsight) {
-    insights.push(supportPatternInsight);
+  if (signalPatternInsight) {
+    insights.push(signalPatternInsight);
   }
 
   insights.push(...getLimitInsights(latestEntry, null));
@@ -1822,7 +1960,7 @@ function buildAiCoachSnapshot(localInsights) {
       completedRecently: (habit.completions || []).filter((dateKey) => daysBetween(dateKey, today) <= 30)
     })),
     missedDeadlines: taskDeadlineEvents.slice(0, 30),
-    archiveAAndarchiveC: archiveAEntries.slice(0, 30).map((entry) => ({
+    taskSignals: archiveAEntries.slice(0, 30).map((entry) => ({
       date: entry.date,
       valueA: entry.valueA,
       valueB: entry.valueB,
@@ -1833,7 +1971,7 @@ function buildAiCoachSnapshot(localInsights) {
       diastolic: entry.diastolic,
       water: entry.water
     })),
-    archiveB: archiveBEntries.slice(0, 30).map((entry) => ({
+    issues: archiveBEntries.slice(0, 30).map((entry) => ({
       date: entry.date,
       name: entry.name,
       severity: entry.severity,
@@ -1849,8 +1987,8 @@ function getDataTrendInsights() {
     getTaskTrendInsight(),
     getDeadlineTrendInsight(),
     getNumericTrendInsight("Water trend", archiveAEntries, "water", "oz", 12, true),
-    getNumericTrendInsight("valueC trend", archiveAEntries, "valueC", "lb", 10, false),
-    getNumericTrendInsight("valueD trend", archiveAEntries, "valueD", "mg/dL", 8, false),
+    getNumericTrendInsight("Value trend", archiveAEntries, "valueC", "lb", 10, false),
+    getNumericTrendInsight("Reading trend", archiveAEntries, "valueD", "", 8, false),
     getvalueDPatternInsight(),
     getreadingTrendInsight(),
     getarchiveBTrendInsight(),
@@ -1893,8 +2031,8 @@ function getWholeAppTrendInsight() {
   const lowWaterarchiveBDays = scan.filter((day) => Number.isFinite(day.water) && day.water < getDailyWaterGoal() && day.archiveB.length);
   if (lowWaterarchiveBDays.length >= 2) {
     return {
-      title: "water and archiveB link",
-      body: `${lowWaterarchiveBDays.length} recent days had low water plus archiveB. Log water earlier today and compare whether headache, fatigue, dizziness, or nausea ease when water is steadier.`,
+      title: "Water and issue link",
+      body: `${lowWaterarchiveBDays.length} recent days had low water plus logged issues. Log water earlier today and compare whether the day feels easier when water is steadier.`,
       tone: "support",
       destination: "water",
       actionLabel: "Go to water"
@@ -1920,19 +2058,19 @@ function getreadingLimitInsight(entry) {
   if (category.level === "normal") return null;
   if (category.level === "low") {
     return {
-      title: "Low reading pressure",
-      body: `${formatreading(entry.systolic, entry.diastolic)} is at or below the common low reading pressure threshold of 90/60. Hydrate, rise slowly, note archiveB like dizziness, and ask a qualified helper if it repeats or you feel faint.`,
+      title: "Low pressure reading",
+      body: `${formatreading(entry.systolic, entry.diastolic)} is lower than your usual signal range. Recheck calmly and use this only as personal context for planning your day.`,
       tone: "care",
       destination: "archiveC",
-      actionLabel: "Go to archiveC"
+      actionLabel: "Go to signals"
     };
   }
   return {
-    title: `${category.label} reading pressure`,
-    body: `${formatreading(entry.systolic, entry.diastolic)} is ${category.label.toLowerCase()} by American Heart Association categories. Consider a lower-sodium meal, water, a calm recheck, and sharing repeated high readings with a qualified helper.`,
+    title: `${category.label} pressure signal`,
+    body: `${formatreading(entry.systolic, entry.diastolic)} is outside your usual signal range. Use it as context for a calmer recheck and a smaller next task.`,
     tone: category.level === "severe" ? "care" : "support",
     destination: "archiveC",
-    actionLabel: "Go to archiveC"
+    actionLabel: "Go to signals"
   };
 }
 
@@ -1941,31 +2079,31 @@ function getvalueDLimitInsight(entry) {
   if (entry.valueD < 70) {
     const severe = entry.valueD < 54;
     return {
-      title: severe ? "Severely low valueD" : "Low valueD",
-      body: `${formatWholeNumber(entry.valueD)} mg/dL is below the TaskLens low valueD level of 70 mg/dL. Use your care plan, treat lows quickly, recheck, and get support help if archiveB are severe or it keeps happening.`,
+      title: severe ? "Very low reading" : "Low reading",
+      body: `${formatWholeNumber(entry.valueD)} is lower than your usual signal range. Recheck calmly and plan the next task conservatively.`,
       tone: "care",
       destination: "archiveC",
-      actionLabel: "Go to archiveC"
+      actionLabel: "Go to signals"
     };
   }
   if (entry.valueD <= 180) return null;
   return {
-    title: "High valueD",
-    body: `${formatWholeNumber(entry.valueD)} mg/dL is above the TaskLens's common two-hour after-meal target of under 180 mg/dL. Note meal timing, water, stress, and repeated highs so you can discuss patterns with a qualified helper.`,
+    title: "High reading",
+    body: `${formatWholeNumber(entry.valueD)} is higher than your usual signal range. Note timing, water, stress, and task load if you want context later.`,
     tone: "support",
     destination: "archiveC",
-    actionLabel: "Go to archiveC"
+    actionLabel: "Go to signals"
   };
 }
 
 function getvalueALimitInsight(entry) {
   if (!entry || !Number.isFinite(entry.valueA) || entry.valueA <= 2000) return null;
   return {
-    title: "valueA above general guide",
-    body: `${formatWholeNumber(entry.valueA)} valueA is above the FDA's 2,000-valueA general archiveA guide. Try planning one lighter, protein-forward meal or trimming sugary drinks/snacks tomorrow.`,
+    title: "Energy entry above usual",
+    body: `${formatWholeNumber(entry.valueA)} energy units is above your usual signal range. Use it as context for planning tomorrow's tasks.`,
     tone: "support",
     destination: "archiveC",
-    actionLabel: "Go to archiveA"
+    actionLabel: "Go to signals"
   };
 }
 
@@ -1973,20 +2111,20 @@ function getvalueBLimitInsight(entry) {
   if (!entry || !Number.isFinite(entry.valueB)) return null;
   if (entry.valueB < 130) {
     return {
-      title: "valueB below RDA",
-      body: `${formatWholeNumber(entry.valueB)}g valueB is below the 130g adult RDA from the National Academies. If this was not intentional, add nutrient-dense valueB like fruit, beans, vegetables, or whole grains.`,
+      title: "Fuel entry below usual",
+      body: `${formatWholeNumber(entry.valueB)}g fuel is below your usual signal range. Use it as context for energy and task pacing.`,
       tone: "support",
       destination: "archiveC",
-      actionLabel: "Go to archiveA"
+      actionLabel: "Go to signals"
     };
   }
   if (entry.valueB <= 275) return null;
   return {
-    title: "valueB above daily value",
-    body: `${formatWholeNumber(entry.valueB)}g valueB is above the FDA daily value of 275g. Swap one refined-valueB item for vegetables, beans, or a smaller whole-grain portion.`,
+    title: "Fuel entry above usual",
+    body: `${formatWholeNumber(entry.valueB)}g fuel is above your usual signal range. Use it as context for tomorrow's plan.`,
     tone: "support",
     destination: "archiveC",
-    actionLabel: "Go to archiveA"
+    actionLabel: "Go to signals"
   };
 }
 
@@ -1995,8 +2133,8 @@ function getvalueCLimitInsight(entry) {
   const bmi = getLatestBmi(entry.valueC);
   if (!Number.isFinite(bmi)) {
     return {
-      title: "Add height for valueC AI",
-      body: "valueC needs height to be interpreted. Add your height in Settings so the coach can compare valueC to TaskLens BMI categories instead of guessing.",
+      title: "Add context for value AI",
+      body: "This value needs more context to be useful. Add supporting setup details only if you want better trend notes.",
       tone: "action",
       destination: "settings",
       actionLabel: "Go to settings"
@@ -2005,11 +2143,11 @@ function getvalueCLimitInsight(entry) {
   const category = getBmiCategory(bmi);
   if (category.level === "balanced") return null;
   return {
-    title: `${category.label} BMI range`,
-    body: `Your latest valueC calculates to BMI ${bmi.toFixed(1)}, in the TaskLens ${category.label.toLowerCase()} range. Use this as a screening signal and focus on steady food, water, sleep, and movement patterns.`,
+    title: `${category.label} value range`,
+    body: `Your latest value is outside your usual range. Use it only as a planning signal alongside sleep, water, and task load.`,
     tone: "support",
     destination: "archiveC",
-    actionLabel: "Go to valueC"
+    actionLabel: "Go to signals"
   };
 }
 
@@ -2084,116 +2222,7 @@ function matchesAnyPattern(value, patterns) {
   });
 }
 
-function getsupportPatternInsight() {
-  const recentText = getRecentfocusLogText(14);
-  const latestarchiveC = archiveAEntries[0];
-  const recentarchiveC = archiveAEntries.slice(0, 7);
-  if (!recentText && !recentarchiveC.length) return null;
-
-  if (matchesAnyPattern(recentText, [
-    /\b(chest pain|chest pressure|tight chest|shortness of breath|trouble breathing|cold sweat|jaw pain|left arm pain|faint|fainting)\b/i
-  ])) {
-    return {
-      title: "Priority archiveB pattern",
-      body: "Recent notes include archiveB that overlap with TaskLens priority issue warning signs. This app cannot assess it. If these archiveB are happening now, get help.",
-      tone: "care",
-      destination: "archiveB",
-      actionLabel: "Go to archiveB"
-    };
-  }
-
-  if (matchesAnyPattern(recentText, [
-    /\b(face droop|facial droop|one side weak|major blocker|slurred speech|trouble speaking|sudden confusion|sudden major blocker|loss of balance|sudden vision)\b/i
-  ])) {
-    return {
-      title: "priority issue warning pattern",
-      body: "Recent notes include archiveB that overlap with TaskLens priority issue warning signs. If major blocker, major blocker, major blocker, sudden confusion, major blocker, or major blocker is happening now, get help.",
-      tone: "care",
-      destination: "archiveB",
-      actionLabel: "Go to archiveB"
-    };
-  }
-
-  const highPressureCount = recentarchiveC.filter((entry) => getreadingCategory(entry.systolic, entry.diastolic).level !== "normal" && getreadingCategory(entry.systolic, entry.diastolic).level !== "low").length;
-  if (latestarchiveC && getreadingCategory(latestarchiveC.systolic, latestarchiveC.diastolic).level === "severe") {
-    return {
-      title: "Severe reading pressure pattern",
-      body: `${formatreading(latestarchiveC.systolic, latestarchiveC.diastolic)} is in the severe range. High reading pressure often has no archiveB, but severe readings with chest pain, shortness of breath, weakness, vision change, confusion, or major blocker need urgent support help.`,
-      tone: "care",
-      destination: "archiveC",
-      actionLabel: "Go to archiveC"
-    };
-  }
-  if (highPressureCount >= 3) {
-    return {
-      title: "Hypertension pattern",
-      body: `${highPressureCount} recent reading pressure readings were above normal. TaskLens notes high reading pressure often has no archiveB, so repeated readings are worth sharing with a qualified helper.`,
-      tone: "support",
-      destination: "archiveC",
-      actionLabel: "Go to history"
-    };
-  }
-
-  const respiratoryHits = countsupportMatches(recentText, [
-    /\b(fever|chills)\b/i,
-    /\b(cough|sore throat|runny nose|congestion)\b/i,
-    /\b(body aches|muscle aches|headache|fatigue|tired)\b/i,
-    /\b(loss of taste|loss of smell)\b/i,
-    /\b(shortness of breath|trouble breathing)\b/i
-  ]);
-  if (respiratoryHits >= 3) {
-    return {
-      title: "Respiratory illness pattern",
-      body: "Recent archiveB overlap with TaskLens flu/COVID archiveB lists. Consider rest, water, limiting exposure to others, testing when appropriate, and support care for trouble breathing, chest pain, confusion, worsening archiveB, or high-risk conditions.",
-      tone: "care",
-      destination: "archiveB",
-      actionLabel: "Go to archiveB"
-    };
-  }
-
-  const utiHits = countsupportMatches(recentText, [
-    /\b(burning pee|burning urination|painful urination|pain when urinating)\b/i,
-    /\b(frequent urination|urgent urination|pee often|urinate often)\b/i,
-    /\b(lower task friction|task pressure|unclear note|dark urine|unclear note)\b/i,
-    /\b(back pain|side pain|flank pain|fever|shaky|shakiness)\b/i
-  ]);
-  if (utiHits >= 2) {
-    return {
-      title: "UTI archiveB pattern",
-      body: "Recent notes overlap with TaskLens urinary tract infection archiveB. A qualified helper can confirm this with urine testing; seek prompt care for fever, back or side pain, vomiting, pregnancy, or worsening archiveB.",
-      tone: "care",
-      destination: "archiveB",
-      actionLabel: "Go to archiveB"
-    };
-  }
-
-  const lowWaterHits = countsupportMatches(recentText, [
-    /\b(extreme thirst|very thirsty|dark urine|not peeing|less urination)\b/i,
-    /\b(dizzy|dizziness|lightheaded|fatigue|confusion)\b/i,
-    /\b(vomiting|discomfort|fever|sweating|heat)\b/i
-  ]);
-  const lowWaterCount = recentarchiveC.filter((entry) => Number.isFinite(entry.water) && entry.water < getDailyWaterGoal()).length;
-  if (lowWaterHits >= 2 || (lowWaterHits >= 1 && lowWaterCount >= 2)) {
-    return {
-      title: "lowWater pattern",
-      body: "Recent water logs and notes overlap with task support lowWater archiveB. Increase water if safe for you, and get support help for confusion, fainting, inability to keep water down, dark or black stool, or discomfort lasting 24 hours or more.",
-      tone: "care",
-      destination: "water",
-      actionLabel: "Go to water"
-    };
-  }
-
-  const highvalueDCount = recentarchiveC.filter((entry) => Number.isFinite(entry.valueD) && entry.valueD > 180).length;
-  if (highvalueDCount >= 2 && matchesAnyPattern(recentText, [/\b(very thirsty|extreme thirst|frequent urination|pee often|blurred vision|fatigue|tired)\b/i])) {
-    return {
-      title: "High valueD archiveB pattern",
-      body: "Repeated high valueD with thirst, frequent urination, fatigue, or blurred vision can fit diabetes-related warning patterns described by TaskLens. Track timing and discuss repeated highs with a qualified helper.",
-      tone: "support",
-      destination: "archiveC",
-      actionLabel: "Go to history"
-    };
-  }
-
+function getSignalPatternInsight() {
   return null;
 }
 
@@ -2213,7 +2242,7 @@ function getRecentfocusLogText(days) {
   return parts.filter(Boolean).join(" ");
 }
 
-function countsupportMatches(value, patterns) {
+function countSignalMatches(value, patterns) {
   return patterns.reduce((count, pattern) => count + (pattern.test(value) ? 1 : 0), 0);
 }
 
@@ -2300,8 +2329,8 @@ function getvalueDPatternInsight() {
   const highCount = readings.filter((entry) => entry.valueD > 180).length;
   if (lowCount >= 2) {
     return {
-      title: "Low valueD pattern",
-      body: `${lowCount} of your last ${readings.length} valueD readings were below 70 mg/dL. Look for timing patterns around meals, activity, medication, sleep, or alcohol, and bring repeated lows to your care team.`,
+      title: "Low reading pattern",
+      body: `${lowCount} of your last ${readings.length} readings were below your usual range. Look for timing patterns around task load, water, sleep, or stress.`,
       tone: "care",
       destination: "archiveC",
       actionLabel: "Go to history"
@@ -2309,8 +2338,8 @@ function getvalueDPatternInsight() {
   }
   if (highCount >= 3) {
     return {
-      title: "High valueD pattern",
-      body: `${highCount} of your last ${readings.length} valueD readings were above 180 mg/dL. Check whether they cluster after specific meals, stress, missed sleep, or lower activity days.`,
+      title: "High reading pattern",
+      body: `${highCount} of your last ${readings.length} readings were above your usual range. Check whether they cluster around stress, missed sleep, or heavier task days.`,
       tone: "support",
       destination: "archiveC",
       actionLabel: "Go to history"
@@ -2335,8 +2364,8 @@ function getreadingTrendInsight() {
   if (Math.abs(sysChange) < 5 && Math.abs(diaChange) < 3) return null;
   const improved = sysChange < 0 && diaChange <= 1;
   return {
-    title: improved ? "reading trending down" : "reading trending up",
-    body: `Recent average moved ${formatTrendAmount(sysChange, "systolic")} and ${formatTrendAmount(diaChange, "diastolic")} compared with the prior readings.`,
+    title: improved ? "Pressure reading trending down" : "Pressure reading trending up",
+    body: `Recent average moved ${formatTrendAmount(sysChange, "first value")} and ${formatTrendAmount(diaChange, "second value")} compared with the prior readings.`,
     tone: improved ? "steady" : "support"
   };
 }
@@ -2417,7 +2446,7 @@ function getfocusLogPatternInsight() {
   if (stressHits.length >= 1) {
     return {
       title: "focusLog stress pattern",
-      body: `${stressHits.length} recent focusLog entries mention stress or anxiety. Reduce the next task list, add a short reset task, and check whether water, valueD, reading pressure, or archiveB changed on the same dates.`,
+      body: `${stressHits.length} recent focusLog entries mention stress or anxiety. Reduce the next task list, add a short reset task, and check whether water, readings, pressure, or issues changed on the same dates.`,
       tone: "care",
       destination: "focusLog",
       actionLabel: "Go to focusLog"
@@ -2785,7 +2814,7 @@ function togglevalueCUnit() {
 function updatevalueCConvertButton() {
   convertvalueC.textContent = valueCUnit === "lb" ? "lbs to kgs" : "kgs to lbs";
   if (valueCUnitLabel) {
-    valueCUnitLabel.textContent = valueCUnit === "lb" ? "valueC (lbs)" : "valueC (kgs)";
+    valueCUnitLabel.textContent = valueCUnit === "lb" ? "Value (lbs)" : "Value (kgs)";
   }
 }
 
@@ -3450,6 +3479,7 @@ function openTaskBreakdownPrompt(task, options = {}) {
 
   generateButton.addEventListener("click", () => generateTaskBreakdown(task, modal));
   if (options.autoPhoto) modal.issuePhotoInput?.click();
+  if (options.autoGallery) modal.issueGalleryPhotoInput?.click();
 }
 
 function openTaskBreakdownDialog(task) {
@@ -3885,7 +3915,9 @@ function buildTaskBreakdownDetailInput(task, modal) {
   const composer = document.createElement("div");
   const textarea = document.createElement("textarea");
   const photoInput = document.createElement("input");
+  const galleryInput = document.createElement("input");
   const photoButton = document.createElement("button");
+  const galleryButton = document.createElement("button");
   const photoPreview = document.createElement("img");
   const photoAnalysis = document.createElement("p");
   const tools = document.createElement("div");
@@ -3904,17 +3936,27 @@ function buildTaskBreakdownDetailInput(task, modal) {
   photoInput.capture = "environment";
   photoInput.className = "task-breakdown-photo-input";
   photoInput.hidden = true;
+  galleryInput.type = "file";
+  galleryInput.accept = "image/*";
+  galleryInput.className = "task-breakdown-photo-input";
+  galleryInput.hidden = true;
   photoButton.className = "text-button task-breakdown-icon-button";
   photoButton.type = "button";
-  photoButton.textContent = "Add photo";
-  photoButton.setAttribute("aria-label", "Attach a photo for AI");
+  photoButton.textContent = "Take photo";
+  photoButton.setAttribute("aria-label", "Take a photo for AI");
+  galleryButton.className = "text-button task-breakdown-icon-button";
+  galleryButton.type = "button";
+  galleryButton.textContent = "Choose photo";
+  galleryButton.setAttribute("aria-label", "Choose an existing photo for AI");
   photoPreview.className = "task-breakdown-photo-preview";
   photoPreview.alt = "Selected issue photo preview";
   photoPreview.hidden = true;
   photoAnalysis.className = "task-breakdown-photo-analysis";
   photoAnalysis.hidden = true;
   modal.issuePhotoInput = photoInput;
+  modal.issueGalleryPhotoInput = galleryInput;
   modal.issuePhotoButton = photoButton;
+  modal.issueGalleryPhotoButton = galleryButton;
   modal.issuePhotoPreview = photoPreview;
   modal.issuePhotoAnalysis = photoAnalysis;
   modal.issueQuestionInput = textarea;
@@ -3922,10 +3964,12 @@ function buildTaskBreakdownDetailInput(task, modal) {
 
   tools.className = "task-breakdown-tools";
   photoInput.addEventListener("change", () => handleTaskBreakdownPhoto(photoInput, modal));
+  galleryInput.addEventListener("change", () => handleTaskBreakdownPhoto(galleryInput, modal));
   photoButton.addEventListener("click", () => photoInput.click());
+  galleryButton.addEventListener("click", () => galleryInput.click());
 
-  tools.append(photoButton);
-  composer.append(textarea, photoInput);
+  tools.append(photoButton, galleryButton);
+  composer.append(textarea, photoInput, galleryInput);
   wrap.append(photoPreview, photoAnalysis, composer, tools);
   return wrap;
 }
@@ -3954,7 +3998,8 @@ async function handleTaskBreakdownPhoto(input, modal) {
     };
     modal.issuePhotoPreview.src = resized.preview;
     modal.issuePhotoPreview.hidden = false;
-    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Change photo";
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Retake photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose another";
     if (modal.issuePhotoAnalysis) {
       modal.issuePhotoAnalysis.hidden = false;
       modal.issuePhotoAnalysis.textContent = "Photo ready. Submit to build the checklist.";
@@ -3964,7 +4009,8 @@ async function handleTaskBreakdownPhoto(input, modal) {
     modal.issueImagePreviewDataUrl = "";
     modal.issuePhotoTelemetry = null;
     input.value = "";
-    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Add photo";
+    if (modal.issuePhotoButton) modal.issuePhotoButton.textContent = "Take photo";
+    if (modal.issueGalleryPhotoButton) modal.issueGalleryPhotoButton.textContent = "Choose photo";
     if (modal.issuePhotoAnalysis) {
       modal.issuePhotoAnalysis.hidden = true;
       modal.issuePhotoAnalysis.textContent = "";
@@ -3977,16 +4023,17 @@ async function prepareTaskBreakdownImages(file) {
   const image = await loadTaskBreakdownImageFile(file);
   const preview = renderTaskBreakdownImageDataUrl(image, 640, 0.64);
   const attempts = [
-    [720, 0.58],
-    [600, 0.52],
-    [500, 0.46]
+    [520, 0.46],
+    [420, 0.38],
+    [320, 0.32],
+    [240, 0.28]
   ];
   for (const [maxSide, quality] of attempts) {
     const upload = renderTaskBreakdownImageDataUrl(image, maxSide, quality);
-    if (upload.length <= 650000) return { upload, preview };
+    if (upload.length <= 180000) return { upload, preview };
   }
   return {
-    upload: renderTaskBreakdownImageDataUrl(image, 420, 0.42),
+    upload: renderTaskBreakdownImageDataUrl(image, 240, 0.24),
     preview
   };
 }
@@ -4013,6 +4060,23 @@ function renderTaskBreakdownImageDataUrl(image, maxSide = 1200, quality = 0.82) 
   const context = canvas.getContext("2d", { alpha: false });
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+async function downscaleTaskBreakdownImageDataUrl(imageDataUrl, maxSide = 420, quality = 0.36) {
+  const source = String(imageDataUrl || "").trim();
+  if (!source.startsWith("data:image/")) return "";
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onerror = () => resolve("");
+    image.onload = () => {
+      try {
+        resolve(renderTaskBreakdownImageDataUrl(image, maxSide, quality));
+      } catch {
+        resolve("");
+      }
+    };
+    image.src = source;
+  });
 }
 
 async function resizeTaskBreakdownImage(file, maxSide = 1200, quality = 0.82) {
@@ -4185,30 +4249,46 @@ function getPhotoAiUsage() {
     const period = getPhotoAiUsagePeriod();
     return {
       period,
-      count: usage?.period === period ? Number(usage.count) || 0 : 0
+      count: usage?.period === period ? Number(usage.count) || 0 : 0,
+      afterCount: usage?.period === period ? Number(usage.afterCount) || 0 : 0
     };
   } catch {
-    return { period: getPhotoAiUsagePeriod(), count: 0 };
+    return { period: getPhotoAiUsagePeriod(), count: 0, afterCount: 0 };
   }
 }
 
 function incrementPhotoAiUsage() {
-  if (appSettings.premiumUnlocked) return;
   const usage = getPhotoAiUsage();
   localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
     period: usage.period,
-    count: Math.min(999, usage.count + 1)
+    count: Math.min(999, usage.count + 1),
+    afterCount: usage.afterCount
+  }));
+}
+
+function incrementAfterImageUsage() {
+  const usage = getPhotoAiUsage();
+  localStorage.setItem(photoAiUsageStoreKey, JSON.stringify({
+    period: usage.period,
+    count: usage.count,
+    afterCount: Math.min(999, usage.afterCount + 1)
   }));
 }
 
 function canUsePremiumPhotoAi() {
-  if (appSettings.premiumUnlocked) return true;
+  if (appSettings.premiumUnlocked) return getPhotoAiUsage().count < PREMIUM_PHOTO_AI_LIMIT;
   return getPhotoAiUsage().count < FREE_PHOTO_AI_LIMIT;
 }
 
+function canUseAfterImageAi() {
+  return Boolean(appSettings.premiumUnlocked) && getPhotoAiUsage().afterCount < PREMIUM_AFTER_IMAGE_LIMIT;
+}
+
 function getPhotoAiUsageLabel() {
-  if (appSettings.premiumUnlocked) return "Premium photo AI unlocked.";
   const usage = getPhotoAiUsage();
+  if (appSettings.premiumUnlocked) {
+    return `${Math.max(0, PREMIUM_PHOTO_AI_LIMIT - usage.count)} of ${PREMIUM_PHOTO_AI_LIMIT} premium before-photo checklists and ${Math.max(0, PREMIUM_AFTER_IMAGE_LIMIT - usage.afterCount)} of ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures left this month.`;
+  }
   return `${Math.max(0, FREE_PHOTO_AI_LIMIT - usage.count)} of ${FREE_PHOTO_AI_LIMIT} free photo checklists left this month.`;
 }
 
@@ -4220,7 +4300,7 @@ function showPhotoAiLimitMessage(modal) {
   const textOnlyButton = document.createElement("button");
   const settingsButtonLocal = document.createElement("button");
   message.className = "task-breakdown-status";
-  message.textContent = `You used the ${FREE_PHOTO_AI_LIMIT} free photo checklists for this month. Premium will unlock more photo breakdowns for ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}. Text-only task checklists still work.`;
+  message.textContent = `You used the ${FREE_PHOTO_AI_LIMIT} free photo checklists for this month. Premium includes ${PREMIUM_PHOTO_AI_LIMIT} before-photo checklists and ${PREMIUM_AFTER_IMAGE_LIMIT} after pictures per month for ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}. Text-only task checklists still work.`;
   actions.className = "settings-actions task-breakdown-actions";
   textOnlyButton.className = "primary-button";
   textOnlyButton.type = "button";
@@ -4233,9 +4313,18 @@ function showPhotoAiLimitMessage(modal) {
     modal.issueImagePreviewDataUrl = "";
     generateTaskBreakdown(modal.task, modal);
   });
-  settingsButtonLocal.addEventListener("click", () => settingsButton?.click());
+  settingsButtonLocal.addEventListener("click", () => accountButton?.click());
   actions.append(textOnlyButton, settingsButtonLocal);
   modal.body.append(message, actions);
+}
+
+function showAfterImageLimitMessage() {
+  if (!appSettings.premiumUnlocked) {
+    showToast(`After pictures are included with Premium: ${PREMIUM_MONTHLY_PRICE} or ${PREMIUM_YEARLY_PRICE}.`);
+    accountButton?.click();
+    return;
+  }
+  showToast(`You used all ${PREMIUM_AFTER_IMAGE_LIMIT} Premium after pictures for this month.`);
 }
 
 function getTaskBreakdownErrorMessage(error) {
@@ -4249,37 +4338,105 @@ function getTaskBreakdownErrorMessage(error) {
 async function fetchTaskBreakdown(task, options = {}) {
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
   const backendUrl = getConfiguredAiBackendUrl();
   if (!backendUrl) throw new Error("AI service is not configured.");
-  const response = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      task: {
-        name: task.name,
-        date: getTaskDateKey(task),
-        day: getTaskDay(task),
-        category: task.category,
-        priority: task.priority,
-        size: task.size,
-        deadline: task.deadline,
-        note: task.note,
-        dictationDetails: buildTaskBreakdownContext(task, options),
-        issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
-        imageDataUrl: String(options.imageDataUrl || "").slice(0, 900000)
-      }
-    })
-  }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+  const imageDataUrl = String(options.imageDataUrl || "").slice(0, 900000);
+  const taskPayload = {
+    task: {
+      name: task.name,
+      date: getTaskDateKey(task),
+      day: getTaskDay(task),
+      category: task.category,
+      priority: task.priority,
+      size: task.size,
+      deadline: task.deadline,
+      note: task.note,
+      dictationDetails: buildTaskBreakdownContext(task, options),
+      issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+      imageDataUrl
     }
-    if (response.status === 413) {
-      throw new Error("That photo is too large for the backend. Try a smaller photo.");
-    }
-    throw new Error(await getFriendlyAiError(response, "AI task breakdown"));
+  };
+  const rawPhotoBlob = imageDataUrl ? dataUrlToBlob(imageDataUrl) : null;
+  if (rawPhotoBlob) {
+    delete headers["Content-Type"];
+    headers["X-Task-Meta"] = encodeURIComponent(JSON.stringify({
+      ...taskPayload.task,
+      imageDataUrl: ""
+    }));
+    headers["Content-Type"] = rawPhotoBlob.mime;
   }
-  return normalizeTaskBreakdown(await response.json(), task);
+  try {
+    const response = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+      method: "POST",
+      headers,
+      body: rawPhotoBlob ? rawPhotoBlob.blob : JSON.stringify(taskPayload)
+    }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+      }
+      if (response.status === 413) {
+        throw new Error("That photo is too large for the backend. Try a smaller photo.");
+      }
+      throw new Error(await getFriendlyAiError(response, "AI task breakdown"));
+    }
+    return normalizeTaskBreakdown(await response.json(), task);
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (imageDataUrl && /failed to fetch|networkerror|network error|fetch failed/i.test(message)) {
+      const smallerImageDataUrl = await downscaleTaskBreakdownImageDataUrl(imageDataUrl);
+      if (smallerImageDataUrl && smallerImageDataUrl.length < imageDataUrl.length) {
+        const retryResponse = await fetchWithTimeout(`${backendUrl}/api/tasks/breakdown`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task: {
+              name: task.name,
+              date: getTaskDateKey(task),
+              day: getTaskDay(task),
+              category: task.category,
+              priority: task.priority,
+              size: task.size,
+              deadline: task.deadline,
+              note: task.note,
+              dictationDetails: buildTaskBreakdownContext(task, options),
+              issueQuestion: String(options.issueQuestion || "").trim().slice(0, 500),
+              imageDataUrl: smallerImageDataUrl.slice(0, 900000)
+            }
+          })
+        }, AI_TASK_BREAKDOWN_TIMEOUT_MS);
+        if (retryResponse.ok) {
+          return normalizeTaskBreakdown(await retryResponse.json(), task);
+        }
+        if (retryResponse.status === 404) {
+          throw new Error("That backend has not been updated for AI task photos yet. Deploy the latest backend, then try again.");
+        }
+        if (retryResponse.status === 413) {
+          throw new Error("That photo is too large for the backend. Try a smaller photo.");
+        }
+        throw new Error(await getFriendlyAiError(retryResponse, "AI task breakdown"));
+      }
+    }
+    throw error;
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+  const extension = match[1].toLowerCase().replace("jpeg", "jpg");
+  const mime = extension === "jpg" ? "image/jpeg" : `image/${extension}`;
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return {
+    blob: new Blob([bytes], { type: mime }),
+    mime
+  };
 }
 
 async function fetchTaskTargetImage(task, breakdown) {
@@ -4289,6 +4446,8 @@ async function fetchTaskTargetImage(task, breakdown) {
   if (!imageDataUrl) return null;
   const headers = { "Content-Type": "application/json" };
   if (appSettings.aiBackendToken) headers["X-App-Token"] = appSettings.aiBackendToken;
+  const accountIdToken = await getTaskLensAccountIdToken();
+  if (accountIdToken) headers.Authorization = `Bearer ${accountIdToken}`;
   const backendUrl = getConfiguredAiBackendUrl();
   if (!backendUrl) throw new Error("AI service is not configured.");
   const response = await fetchWithTimeout(`${backendUrl}/api/tasks/target-image`, {
@@ -4322,6 +4481,17 @@ async function fetchTaskTargetImage(task, breakdown) {
   return targetImageDataUrl.startsWith("data:image/") ? targetImageDataUrl.slice(0, 2200000) : null;
 }
 
+async function getTaskLensAccountIdToken() {
+  try {
+    if (typeof window.TaskLensAuth?.getIdToken === "function") {
+      return String(await window.TaskLensAuth.getIdToken() || "").trim();
+    }
+  } catch {
+    // The backend will return a sign-in error if account enforcement is enabled.
+  }
+  return "";
+}
+
 async function fetchAndSaveTaskTargetImage(task, modal, breakdown) {
   const requestStartedAt = performance.now();
   try {
@@ -4351,6 +4521,7 @@ async function fetchAndSaveTaskTargetImage(task, modal, breakdown) {
       targetImagePending: false
     };
     saveTaskBreakdowns();
+    incrementAfterImageUsage();
     recordPhotoAiTelemetry(task, taskBreakdowns[task.id], targetImageDataUrl ? "after_image_ok" : "after_image_empty");
     if (modal?.body?.isConnected) renderTaskBreakdownSteps(task, modal, taskBreakdowns[task.id]);
     render();
@@ -4400,6 +4571,10 @@ function recordPhotoAiTelemetry(task, breakdown, eventName) {
 function requestTaskTargetImage(task, modal, breakdown) {
   if (!String(breakdown?.sourceImageDataUrl || "").startsWith("data:image/")) {
     showToast("Add a before photo first.");
+    return;
+  }
+  if (!canUseAfterImageAi()) {
+    showAfterImageLimitMessage();
     return;
   }
   if (breakdown.targetImagePending) return;
@@ -5473,7 +5648,7 @@ function renderarchiveA() {
   avgvalueB.textContent = valueBValues.length ? `${formatWholeNumber(getSum(valueBValues))}g` : "0g";
   latestvalueC.textContent = latestvalueCEntry ? `${formatDecimal(latestvalueCEntry.valueC)} lb` : "--";
   latestphase.textContent = latestphaseEntry ? formatphasePhase(latestphaseEntry.phasePhase) : "--";
-  latestvalueD.textContent = latestvalueDEntry ? `${formatWholeNumber(latestvalueDEntry.valueD)} mg/dL` : "--";
+  latestvalueD.textContent = latestvalueDEntry ? `${formatWholeNumber(latestvalueDEntry.valueD)}` : "--";
   latestreading.textContent = latestreadingEntry
     ? formatreading(latestreadingEntry.systolic, latestreadingEntry.diastolic, true)
     : "--";
@@ -5494,7 +5669,7 @@ function renderarchiveA() {
         Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
         Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
         formatphasePhase(entry.phasePhase),
-        Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)} mg/dL` : "--",
+        Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
         formatreading(entry.systolic, entry.diastolic),
         Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
         formatvalueCDelta(delta)
@@ -5544,7 +5719,7 @@ function renderHistory() {
       Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
       Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
       formatphasePhase(entry.phasePhase),
-      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)} mg/dL` : "--",
+      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
       formatreading(entry.systolic, entry.diastolic),
       Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
       formatvalueCDelta(delta)
@@ -5577,7 +5752,7 @@ function renderMasterChart() {
       Number.isFinite(entry.valueB) ? `${formatWholeNumber(entry.valueB)}g` : "--",
       Number.isFinite(entry.valueC) ? `${formatDecimal(entry.valueC)} lb` : "--",
       formatphasePhase(entry.phasePhase),
-      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)} mg/dL` : "--",
+      Number.isFinite(entry.valueD) ? `${formatWholeNumber(entry.valueD)}` : "--",
       formatreading(entry.systolic, entry.diastolic),
       Number.isFinite(entry.water) ? `${formatWholeNumber(entry.water)} oz` : "--",
       entry.archiveB || "--",
@@ -5872,8 +6047,8 @@ function getHistoryPointLabel(item, key) {
     valueC: "valueC",
     valueA: "valueA",
     valueB: "valueB",
-    valueD: "valueD",
-    pressure: "reading",
+    valueD: "Reading",
+    pressure: "Pressure",
     water: "Water"
   };
   const value = key === "pressure"
@@ -5886,7 +6061,7 @@ function formatHistoryPointValue(key, value) {
   if (!Number.isFinite(value)) return "--";
   if (key === "valueC") return `${formatDecimal(value)} lb`;
   if (key === "valueB") return `${formatWholeNumber(value)}g`;
-  if (key === "valueD") return `${formatWholeNumber(value)} mg/dL`;
+  if (key === "valueD") return `${formatWholeNumber(value)}`;
   if (key === "water") return `${formatWholeNumber(value)} oz`;
   return formatWholeNumber(value);
 }
@@ -6631,7 +6806,7 @@ function loadAppSettings() {
       guestModeEnabled: false,
       biometricEnabled: false,
       biometricCredentialId: "",
-      initialDataComplete: hasSavedSettings,
+      initialDataComplete: true,
       aiExtractionEnabled: true,
       cloudAiConfirmed: true,
       aiApiKey: "",
@@ -6643,6 +6818,7 @@ function loadAppSettings() {
       premiumUnlocked: false,
       ...savedSettings
     };
+    settings.initialDataComplete = true;
     const oldCloudConsentKey = `${"hi"}${"paa"}CloudConfirmed`;
     if (Object.prototype.hasOwnProperty.call(savedSettings, oldCloudConsentKey) && !Object.prototype.hasOwnProperty.call(savedSettings, "cloudAiConfirmed")) {
       settings.cloudAiConfirmed = Boolean(savedSettings[oldCloudConsentKey]);
@@ -6665,7 +6841,7 @@ function loadAppSettings() {
       guestModeEnabled: false,
       biometricEnabled: false,
       biometricCredentialId: "",
-      initialDataComplete: hasSavedSettings,
+      initialDataComplete: true,
       aiExtractionEnabled: true,
       cloudAiConfirmed: true,
       aiApiKey: "",
@@ -6694,12 +6870,17 @@ function saveAppSettings() {
   localStorage.setItem(settingsStoreKey, JSON.stringify(appSettings));
 }
 
+function markInitialDataOnboardingComplete() {
+  localStorage.setItem(onboardingCompleteStoreKey, "true");
+}
+
 function applySettings() {
   document.body.dataset.theme = appSettings.theme === "light" ? "light" : "dark";
   renderSettings();
 }
 
 function renderSettings() {
+  renderTaskLensAccountSettings();
   if (themeToggle) themeToggle.checked = appSettings.theme === "dark";
   if (reminderToggle) reminderToggle.checked = Boolean(appSettings.remindersEnabled);
   if (reminderTime) reminderTime.value = hasOwnSetting("reminderTime") ? appSettings.reminderTime : "";
@@ -6731,6 +6912,248 @@ function renderSettings() {
   if (securityPasswordNew) securityPasswordNew.value = "";
   filterSettings();
 }
+
+function getTaskLensFirebaseConfig() {
+  const config = window.TASKLENS_FIREBASE_CONFIG || {};
+  return {
+    apiKey: String(config.apiKey || "").trim(),
+    projectId: String(config.projectId || "").trim()
+  };
+}
+
+function isTaskLensFirebaseConfigured() {
+  return Boolean(getTaskLensFirebaseConfig().apiKey);
+}
+
+function loadTaskLensAuthSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(firebaseAuthStoreKey) || "null");
+    if (!session?.refreshToken || !session?.email || !session?.localId) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function saveTaskLensAuthSession(session) {
+  taskLensAuthSession = session;
+  if (session) localStorage.setItem(firebaseAuthStoreKey, JSON.stringify(session));
+  else localStorage.removeItem(firebaseAuthStoreKey);
+  renderTaskLensAccountSettings();
+}
+
+function renderTaskLensAccountSettings() {
+  if (!accountStatus) return;
+  const configured = isTaskLensFirebaseConfigured();
+  const signedIn = Boolean(taskLensAuthSession?.refreshToken);
+  if (!configured) {
+    accountStatus.textContent = "Account sign-in will be available after Firebase is configured.";
+  } else if (signedIn) {
+    accountStatus.textContent = `Signed in as ${taskLensAuthSession.email}.`;
+  } else {
+    accountStatus.textContent = "Sign in to keep premium access connected to your account.";
+  }
+  if (accountAuthFields) accountAuthFields.hidden = signedIn;
+  if (accountSignInButton) accountSignInButton.hidden = signedIn;
+  if (accountCreateButton) accountCreateButton.hidden = signedIn;
+  if (accountResetPasswordButton) accountResetPasswordButton.hidden = signedIn;
+  if (accountSignOutButton) accountSignOutButton.hidden = !signedIn;
+  [accountEmail, accountPassword, accountSignInButton, accountCreateButton, accountResetPasswordButton].forEach((element) => {
+    if (element) element.disabled = !configured;
+  });
+}
+
+async function createTaskLensAccount() {
+  const email = String(createAccountEmail?.value || "").trim();
+  const password = String(createAccountPassword?.value || "");
+  const confirmPassword = String(createAccountConfirmPassword?.value || "");
+  if (!email || !password || !confirmPassword) {
+    if (createAccountMessage) createAccountMessage.textContent = "Enter your email and password twice.";
+    showToast("Enter your email and password twice.");
+    return;
+  }
+  if (password !== confirmPassword) {
+    if (createAccountMessage) createAccountMessage.textContent = "Passwords do not match.";
+    showToast("Passwords do not match.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    await taskLensFirebaseRequest("accounts:signUp", { email, password, returnSecureToken: true });
+    if (accountEmail) accountEmail.value = email;
+    if (accountPassword) accountPassword.value = "";
+    if (createAccountPassword) createAccountPassword.value = "";
+    if (createAccountConfirmPassword) createAccountConfirmPassword.value = "";
+    closeCreateAccountDialog();
+    renderTaskLensAccountSettings();
+    if (accountStatus) accountStatus.textContent = "Account created. Sign in to continue.";
+    showToast("Account created. Sign in to continue.");
+    setTimeout(() => accountPassword?.focus(), 80);
+  } catch (error) {
+    const message = getTaskLensAuthErrorMessage(error);
+    if (createAccountMessage) createAccountMessage.textContent = message;
+    showToast(message);
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+async function signInTaskLensAccount() {
+  await runTaskLensAccountAction("accounts:signInWithPassword", "Signed in.");
+}
+
+async function runTaskLensAccountAction(action, successMessage) {
+  const email = String(accountEmail?.value || "").trim();
+  const password = String(accountPassword?.value || "");
+  if (!email || !password) {
+    showToast("Enter your email and password.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    const response = await taskLensFirebaseRequest(action, { email, password, returnSecureToken: true });
+    saveTaskLensAuthSession(normalizeTaskLensAuthSession(response));
+    if (accountPassword) accountPassword.value = "";
+    showToast(successMessage);
+    if (pendingAccountAction) {
+      accountModal.hidden = true;
+      accountModal.style.display = "";
+      accountModal.style.zIndex = "";
+      updateDialogScrollLock();
+      setTimeout(runPendingAccountAction, 80);
+    }
+  } catch (error) {
+    showToast(getTaskLensAuthErrorMessage(error));
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+async function sendTaskLensPasswordReset() {
+  const email = String(accountEmail?.value || "").trim();
+  if (!email) {
+    showToast("Enter your email first.");
+    return;
+  }
+  setTaskLensAccountBusy(true);
+  try {
+    await taskLensFirebaseRequest("accounts:sendOobCode", { requestType: "PASSWORD_RESET", email });
+    showToast("Password reset email sent.");
+  } catch (error) {
+    showToast(getTaskLensAuthErrorMessage(error));
+  } finally {
+    setTaskLensAccountBusy(false);
+  }
+}
+
+function signOutTaskLensAccount() {
+  saveTaskLensAuthSession(null);
+  if (accountEmail) accountEmail.value = "";
+  if (accountPassword) accountPassword.value = "";
+  showToast("Signed out.");
+}
+
+function setTaskLensAccountBusy(busy) {
+  [
+    accountEmail,
+    accountPassword,
+    accountSignInButton,
+    accountCreateButton,
+    accountResetPasswordButton,
+    accountSignOutButton,
+    createAccountEmail,
+    createAccountPassword,
+    createAccountConfirmPassword,
+    createAccountSubmitButton,
+    createAccountCancel
+  ].forEach((element) => {
+    if (element) element.disabled = busy || (!isTaskLensFirebaseConfigured() && element !== accountSignOutButton);
+  });
+}
+
+async function getTaskLensFirebaseIdToken() {
+  if (!taskLensAuthSession?.refreshToken) return "";
+  const expiresAt = Number(taskLensAuthSession.expiresAt || 0);
+  if (taskLensAuthSession.idToken && expiresAt > Date.now() + 5 * 60 * 1000) return taskLensAuthSession.idToken;
+  try {
+    const refreshed = await refreshTaskLensAuthSession(taskLensAuthSession.refreshToken);
+    saveTaskLensAuthSession({ ...taskLensAuthSession, ...refreshed });
+    return taskLensAuthSession.idToken || "";
+  } catch {
+    saveTaskLensAuthSession(null);
+    return "";
+  }
+}
+
+async function refreshTaskLensAuthSession(refreshToken) {
+  const { apiKey } = getTaskLensFirebaseConfig();
+  if (!apiKey) throw new Error("FIREBASE_NOT_CONFIGURED");
+  const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error?.message || "AUTH_REFRESH_FAILED");
+  return {
+    idToken: data.id_token,
+    refreshToken: data.refresh_token || refreshToken,
+    localId: data.user_id,
+    expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000
+  };
+}
+
+async function taskLensFirebaseRequest(action, body) {
+  const { apiKey } = getTaskLensFirebaseConfig();
+  if (!apiKey) throw new Error("FIREBASE_NOT_CONFIGURED");
+  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/${action}?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error?.message || "AUTH_REQUEST_FAILED");
+  return data;
+}
+
+function normalizeTaskLensAuthSession(response) {
+  return {
+    idToken: response.idToken,
+    refreshToken: response.refreshToken,
+    email: response.email,
+    localId: response.localId,
+    expiresAt: Date.now() + Number(response.expiresIn || 3600) * 1000
+  };
+}
+
+function getTaskLensAuthErrorMessage(error) {
+  const code = String(error?.message || "");
+  if (/api key not valid|api_key_invalid/i.test(code)) {
+    return "Firebase API key is invalid. Update the app's Firebase configuration.";
+  }
+  if (/operation_not_allowed/i.test(code)) {
+    return "Email and password sign-in is not enabled in Firebase.";
+  }
+  if (/configuration_not_found/i.test(code)) {
+    return "Firebase Authentication is not set up for this project.";
+  }
+  const messages = {
+    FIREBASE_NOT_CONFIGURED: "Account sign-in is not configured yet.",
+    EMAIL_EXISTS: "An account already exists for this email.",
+    EMAIL_NOT_FOUND: "No account was found for this email.",
+    INVALID_PASSWORD: "The password is incorrect.",
+    INVALID_LOGIN_CREDENTIALS: "The email or password is incorrect.",
+    WEAK_PASSWORD: "Use a password with at least 6 characters.",
+    INVALID_EMAIL: "Enter a valid email address.",
+    TOO_MANY_ATTEMPTS_TRY_LATER: "Too many attempts. Try again later."
+  };
+  return messages[code] || `Account request failed: ${code || "unknown Firebase error"}`;
+}
+
+window.TaskLensAuth = {
+  getIdToken: getTaskLensFirebaseIdToken,
+  getUser: () => taskLensAuthSession ? { uid: taskLensAuthSession.localId, email: taskLensAuthSession.email } : null
+};
 
 function hasOwnSetting(key) {
   try {
@@ -7025,6 +7448,7 @@ function resetAppSecurityFromLock() {
     biometricCredentialId: "",
     initialDataComplete: true
   };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   showSecuritySetup();
   lockError.textContent = "Security was reset. Create a new app password.";
@@ -7098,6 +7522,7 @@ function continueAsGuest() {
     biometricCredentialId: "",
     initialDataComplete: true
   };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   finishUnlock();
 }
@@ -7108,15 +7533,11 @@ function finishUnlock() {
   lockModal.hidden = true;
   lockPassword.value = "";
   scrollAppToTop();
-  if (shouldShowInitialDataOnboarding()) {
-    startInitialDataOnboarding();
-  } else {
-    showDailyAffirmation();
-  }
+  showDailyAffirmation();
 }
 
 function shouldShowInitialDataOnboarding() {
-  return appUnlocked && appSettings.initialDataComplete === false;
+  return false;
 }
 
 function startInitialDataOnboarding() {
@@ -7458,7 +7879,6 @@ function getInitialDataSteps() {
         onboardingForm.querySelectorAll("input[name='startingPoint']").forEach((input) => {
           input.addEventListener("change", () => {
             saveOnboardingState({ startingPoint: input.value });
-            goToNextInitialDataStep();
           });
         });
       },
@@ -7500,6 +7920,10 @@ function getInitialDataSteps() {
             <img src="icons/tasklens-camera-button.png?v=245" alt="" aria-hidden="true">
             <span>Start with a photo</span>
           </button>
+          <button id="onboardingGalleryTaskButton" class="primary-button onboarding-photo-button photo-mark-button" type="button">
+            <img src="icons/tasklens-camera-button.png?v=245" alt="" aria-hidden="true">
+            <span>Choose from gallery</span>
+          </button>
           <span>or enter one task</span>
         </div>
         <label class="field onboarding-wide"><span>Task</span><input name="task" type="text"></label>
@@ -7511,6 +7935,7 @@ function getInitialDataSteps() {
         const taskInput = onboardingForm.querySelector("input[name='task']");
         if (taskInput) taskInput.placeholder = startingContext.placeholder;
         onboardingForm.querySelector("#onboardingPhotoTaskButton")?.addEventListener("click", startOnboardingPhotoTask);
+        onboardingForm.querySelector("#onboardingGalleryTaskButton")?.addEventListener("click", startOnboardingGalleryTask);
       },
       save: (formData) => {
         const name = String(formData.get("task") || "").trim();
@@ -7619,6 +8044,16 @@ function getOnboardingStartingContext(state = getOnboardingState()) {
 }
 
 function startOnboardingPhotoTask() {
+  const task = prepareOnboardingPhotoChecklistTask();
+  openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoPhoto: true });
+}
+
+function startOnboardingGalleryTask() {
+  const task = prepareOnboardingPhotoChecklistTask();
+  openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoGallery: true });
+}
+
+function prepareOnboardingPhotoChecklistTask() {
   const onboardingState = getOnboardingState();
   const startingPoint = onboardingState.startingPoint;
   const startingContext = getOnboardingStartingContext(onboardingState);
@@ -7630,12 +8065,13 @@ function startOnboardingPhotoTask() {
     note: startingContext.note
   });
   appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   updateCloudAiSharing(true);
   onboardingModal.hidden = true;
   updateDialogScrollLock();
   render();
-  openTaskBreakdownPrompt(task, { cancelDeletesTask: true, autoPhoto: true });
+  return task;
 }
 
 function parseOnboardingNumber(value) {
@@ -7683,6 +8119,7 @@ function goToNextInitialDataStep() {
 
 function finishInitialDataOnboarding() {
   appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   onboardingModal.hidden = true;
   render();
@@ -7690,7 +8127,12 @@ function finishInitialDataOnboarding() {
 }
 
 function closeInitialDataOnboarding() {
+  const isFinalStep = onboardingStepIndex >= getInitialDataSteps().length - 1;
+  if (isFinalStep && !window.confirm("Discard this setup task and leave onboarding? Choose Cancel to keep going.")) {
+    return;
+  }
   appSettings = { ...appSettings, initialDataComplete: true };
+  markInitialDataOnboardingComplete();
   saveAppSettings();
   onboardingModal.hidden = true;
   render();
@@ -8653,12 +9095,12 @@ function getDictationReviewSteps() {
   const tasks = getDictationTasks(result);
   const steps = [
     {
-      title: "Review archiveA",
+      title: "Review Signals",
       fields: `
-        ${reviewInput("valueA", "valueA", archiveA.valueA, "number")}
-        ${reviewInput("valueB", "valueB", archiveA.valueB, "number")}
-        ${reviewInput("valueC", "valueC", archiveA.valueC, "number")}
-        ${reviewSelect("phasePhase", "phase phase", archiveA.phasePhase, ["", "Entering", "phase", "Deep phase", "Exiting"])}
+        ${reviewInput("valueA", "Energy", archiveA.valueA, "number")}
+        ${reviewInput("valueB", "Fuel", archiveA.valueB, "number")}
+        ${reviewInput("valueC", "Value", archiveA.valueC, "number")}
+        ${reviewSelect("phasePhase", "Phase", archiveA.phasePhase, ["", "Entering", "Steady", "Deep focus", "Exiting"])}
         ${reviewInput("water", "Water oz", archiveA.water, "number")}
       `,
       apply: (data) => {
@@ -8669,11 +9111,11 @@ function getDictationReviewSteps() {
       }
     },
     {
-      title: "Review archiveC",
+      title: "Review Readings",
       fields: `
-        ${reviewInput("valueD", "valueD", archiveA.valueD, "number")}
-        ${reviewInput("systolic", "Systolic BP", archiveA.systolic, "number")}
-        ${reviewInput("diastolic", "Diastolic BP", archiveA.diastolic, "number")}
+        ${reviewInput("valueD", "Reading", archiveA.valueD, "number")}
+        ${reviewInput("systolic", "Pressure A", archiveA.systolic, "number")}
+        ${reviewInput("diastolic", "Pressure B", archiveA.diastolic, "number")}
       `,
       apply: (data) => {
         result.archiveA = result.archiveA || {};
@@ -8682,7 +9124,7 @@ function getDictationReviewSteps() {
       }
     },
     {
-      title: "Review archiveB",
+      title: "Review Issues",
       fields: buildarchiveBReviewFields(archiveB),
       apply: (data) => setDictationarchiveB(result, readarchiveBReviewFields(data, archiveB.length || 1))
     },
@@ -8711,8 +9153,8 @@ function buildarchiveBReviewFields(archiveB) {
   const entries = archiveB.length ? archiveB : [{}];
   return entries.map((archiveB, index) => `
     <div class="dictation-review-section">
-      <h3>archiveB ${index + 1}</h3>
-      ${reviewInput(`archiveBName${index}`, "archiveB", archiveB.name)}
+      <h3>Issue ${index + 1}</h3>
+      ${reviewInput(`archiveBName${index}`, "Issue", archiveB.name)}
       ${reviewSelect(`archiveBeverity${index}`, "Severity", archiveB.severity, ["", "Mild", "Moderate", "Severe"])}
       ${reviewTextarea(`archiveBNote${index}`, "Notes", archiveB.note)}
     </div>
@@ -8784,9 +9226,9 @@ function setOptionalNumber(target, key, value) {
 function buildDictationFieldReview(result) {
   const review = document.createElement("div");
   review.className = "dictation-review-sections";
-  review.appendChild(buildDictationReviewSection("archiveB", buildarchiveBReviewRows(result)));
-  review.appendChild(buildDictationReviewSection("archiveA", buildarchiveAReviewRows(result)));
-  review.appendChild(buildDictationReviewSection("archiveC", buildarchiveCReviewRows(result)));
+  review.appendChild(buildDictationReviewSection("Issues", buildarchiveBReviewRows(result)));
+  review.appendChild(buildDictationReviewSection("Signals", buildarchiveAReviewRows(result)));
+  review.appendChild(buildDictationReviewSection("Readings", buildarchiveCReviewRows(result)));
   review.appendChild(buildDictationReviewSection("Tasks", buildTaskReviewRows(result)));
   return review;
 }
@@ -8794,10 +9236,10 @@ function buildDictationFieldReview(result) {
 function buildarchiveAReviewRows(result) {
   const archiveA = result.archiveA || {};
   return [
-    ["valueA", archiveA.valueA],
-    ["valueB", archiveA.valueB],
-    ["valueC", archiveA.valueC],
-    ["phase", archiveA.phasePhase],
+    ["Energy", archiveA.valueA],
+    ["Fuel", archiveA.valueB],
+    ["Value", archiveA.valueC],
+    ["Phase", archiveA.phasePhase],
     ["Water", Number.isFinite(archiveA.water) ? `${archiveA.water} oz` : archiveA.water]
   ];
 }
@@ -8805,15 +9247,15 @@ function buildarchiveAReviewRows(result) {
 function buildarchiveCReviewRows(result) {
   const archiveA = result.archiveA || {};
   return [
-    ["valueD", archiveA.valueD],
-    ["reading", Number.isFinite(archiveA.systolic) && Number.isFinite(archiveA.diastolic) ? `${archiveA.systolic}/${archiveA.diastolic}` : ""]
+    ["Reading", archiveA.valueD],
+    ["Pressure", Number.isFinite(archiveA.systolic) && Number.isFinite(archiveA.diastolic) ? `${archiveA.systolic}/${archiveA.diastolic}` : ""]
   ];
 }
 
 function buildarchiveBReviewRows(result) {
   const archiveB = [result.archiveB, ...(Array.isArray(result.archiveB) ? result.archiveB : [])].filter(Boolean);
   return archiveB.flatMap((archiveB, index) => [
-    [`archiveB ${index + 1}`, archiveB.name],
+    [`Issue ${index + 1}`, archiveB.name],
     [`Severity ${index + 1}`, archiveB.severity],
     [`Note ${index + 1}`, archiveB.note]
   ]);
@@ -9191,11 +9633,11 @@ function extractStructuredDictationData(text) {
 
 function buildDictationMissingDetails(result, normalized) {
   const missing = [];
-  if (/\b(?:reading pressure|bp)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.systolic) || !Number.isFinite(result.archiveA.diastolic))) {
-    missing.push({ section: "archiveA", field: "readingPressure", question: "What is the reading pressure? Use a format like 120/80." });
+  if (/\b(?:pressure|bp)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.systolic) || !Number.isFinite(result.archiveA.diastolic))) {
+    missing.push({ section: "archiveA", field: "readingPressure", question: "What is the pressure reading? Use a format like 120/80." });
   }
   if (/\b(?:valueD|valueD)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.valueD))) {
-    missing.push({ section: "archiveA", field: "valueD", question: "What is the valueD number?" });
+    missing.push({ section: "archiveA", field: "valueD", question: "What is the reading number?" });
   }
   if (/\b(?:water|water)\b/i.test(normalized) && (!result.archiveA || !Number.isFinite(result.archiveA.water))) {
     missing.push({ section: "archiveA", field: "water", question: "How many ounces of water?" });
@@ -9244,7 +9686,7 @@ function normalizeDictationText(text) {
   return applyDictationTextAliases(replaceSpokenNumbers(String(text || "").toLowerCase()))
     .toLowerCase()
     .replace(/\bb p\b/g, "bp")
-    .replace(/\breadingpressure\b/g, "reading pressure")
+    .replace(/\bpressurevalue\b/g, "pressure")
     .replace(/\bto do\b/g, "todo")
     .replace(/\s+/g, " ")
     .trim();
@@ -9373,18 +9815,18 @@ function getDictatedWater(text) {
 }
 
 function getDictatedreading(text) {
-  const exact = text.match(/\b(?:reading pressure|bp)?\s*(\d{2,3})\s*(?:over|\/)\s*(\d{2,3})\b/i);
-  if (exact && (/\b(?:reading pressure|bp)\b/i.test(text) || Number(exact[1]) >= 70)) {
+  const exact = text.match(/\b(?:pressure|bp)?\s*(\d{2,3})\s*(?:over|\/)\s*(\d{2,3})\b/i);
+  if (exact && (/\b(?:pressure|bp)\b/i.test(text) || Number(exact[1]) >= 70)) {
     return { systolic: Number(exact[1]), diastolic: Number(exact[2]) };
   }
-  const nearby = text.match(/\b(?:reading pressure|bp)\b(?:\s*(?:was|is|at|of))?\s*(\d{2,3})\s+(\d{2,3})\b/i);
+  const nearby = text.match(/\b(?:pressure|bp)\b(?:\s*(?:was|is|at|of))?\s*(\d{2,3})\s+(\d{2,3})\b/i);
   return nearby ? { systolic: Number(nearby[1]), diastolic: Number(nearby[2]) } : null;
 }
 
 function parseDictatedarchiveB(original, normalized) {
   const known = ["headache", "migraine", "fever", "chills", "cough", "congestion", "nausea", "dizzy", "dizziness", "fatigue", "tired", "pain", "sore throat", "chest pain", "shortness of breath", "vomiting", "discomfort", "stomach ache", "back pain", "anxiety", "rash", "sweating", "weakness", "cramps"];
   const found = known.filter((item) => new RegExp(`\\b${item.replace(/\s+/g, "\\s+")}\\b`, "i").test(normalized));
-  const phraseMatch = normalized.match(/\b(?:archiveB|archiveB|i have|i've got|i am having|i'm having|i feel|feeling|felt)\s+(.*?)(?:\b(?:my reading pressure|reading pressure|bp|valueD|valueD|water|valueA|valueB|valueC|focusState|focusLog|task|todo|remind me)\b|$)/i);
+  const phraseMatch = normalized.match(/\b(?:archiveB|archiveB|i have|i've got|i am having|i'm having|i feel|feeling|felt)\s+(.*?)(?:\b(?:pressure|bp|reading|water|valueA|valueB|valueC|focusState|focusLog|task|todo|remind me)\b|$)/i);
   if (!found.length && phraseMatch) {
     const phrase = cleanDictatedPhrase(phraseMatch[1]).replace(/\b(and|also)\b/ig, ",");
     found.push(...phrase.split(",").map(cleanDictatedPhrase).filter(Boolean).slice(0, 3));
@@ -9561,17 +10003,17 @@ async function importreadingFromWatch() {
   }
 
   if (!value) {
-    value = window.prompt("Paste reading pressure from watch app, Samsung wearable app, Fitbit, Garmin, fitness export, or another watch app export.", "") || "";
+    value = window.prompt("Paste a reading from a watch app, wearable app, CSV rows, or another export snippet.", "") || "";
   }
 
   const reading = getreadingReading(value);
   if (!reading) {
-    window.alert("Could not find a reading pressure reading. Paste a value like 120/80, labeled Systolic/Diastolic text, CSV rows, or an watch app export snippet.");
+    window.alert("Could not find a pressure reading. Paste a value like 120/80, labeled paired values, CSV rows, or an export snippet.");
     return;
   }
 
   applyreadingReading(reading);
-  window.alert(`Imported reading pressure ${reading.systolic}/${reading.diastolic}${reading.dateKey ? ` for ${reading.dateKey}` : ""}.`);
+  window.alert(`Imported reading ${reading.systolic}/${reading.diastolic}${reading.dateKey ? ` for ${reading.dateKey}` : ""}.`);
 }
 
 function applyreadingFromUrl() {
