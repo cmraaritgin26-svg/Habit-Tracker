@@ -408,7 +408,7 @@ function getRequestPath(request) {
 function setCorsHeaders(response) {
   response.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token,Authorization,X-Task-Meta");
 }
 
 function sendJson(response, statusCode, payload) {
