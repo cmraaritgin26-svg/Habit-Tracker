@@ -1,11 +1,17 @@
 {
-  "name": "health-task-tracker-ai-backend",
+  "name": "photofinish-it-backend",
   "version": "1.0.0",
-  "description": "Backend API for Health & Task Tracker AI dictation extraction.",
+  "description": "Backend API for PhotoFinish IT dictation extraction.",
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check account-limits.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.4.0",
+    "googleapis": "^159.0.0",
+    "pg": "^8.16.3"
   },
   "engines": {
     "node": ">=18"

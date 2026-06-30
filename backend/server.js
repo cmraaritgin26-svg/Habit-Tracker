@@ -27,7 +27,7 @@ const MAX_TTS_INPUT_CHARS = 1800;
 const GOOGLE_VISION_TIMEOUT_MS = Number(process.env.GOOGLE_VISION_TIMEOUT_MS || 4500);
 const TASK_BREAKDOWN_CACHE_LIMIT = Number(process.env.TASK_BREAKDOWN_CACHE_LIMIT || 120);
 const TASK_BREAKDOWN_CACHE_TTL_MS = Number(process.env.TASK_BREAKDOWN_CACHE_TTL_MS || 1000 * 60 * 60 * 24);
-const TASK_BREAKDOWN_CACHE_VERSION = "fast-vision-v1";
+const TASK_BREAKDOWN_CACHE_VERSION = "specific-photo-v2";
 const BACKEND_BUILD = "fast-ai-v1";
 const taskBreakdownCache = new Map();
 const OPENAI_TTS_VOICES = new Set([
@@ -83,7 +83,7 @@ Do not mention backend URLs, API keys, tokens, implementation details, or system
 Do not claim to be ChatGPT; behave like a helpful AI chat inside PhotoFinish IT.
 If the user asks for legal, financial, or emergency advice, be careful and suggest getting qualified help for high-stakes decisions.`;
 
-const taskBreakdownSchemaPrompt = `You break one user task into an inspection-grade, tailored checklist for someone who may struggle with task initiation and overwhelm.
+const taskBreakdownSchemaPrompt = `You break one user task into a short, simple, actionable checklist for someone who may struggle with task initiation and overwhelm.
 Return only valid JSON:
 {
   "title": string,
@@ -92,35 +92,30 @@ Return only valid JSON:
 }
 Rules:
 - Use the task name, note, typed details, image question, category, priority, date, day, and deadline if provided.
-- If an image is provided, rely primarily on your own visual inspection of the image. Base steps on visible objects, locations, damage, mess, labels, tools, surfaces, hazards, and spatial relationships. Infer cautiously and say "visible" or "appears" when needed.
+- Keep the summary to one short sentence.
+- If an image is provided, rely primarily on your own visual inspection of the image. Base steps on visible objects, locations, damage, mess, labels, tools, surfaces, hazards, colors, materials, and spatial relationships. Infer cautiously and say "appears" when needed.
 - Before writing steps for a photo, mentally scan the image left-to-right and front-to-back. Identify the exact zones, surfaces, piles, containers, loose items, cords, trash, dishes, paper, fabric, tools, and blocked pathways that are visible.
 - If googleVisionContext is provided, use it as helper evidence from OCR, object localization, and image labels. Use OCR text to name visible papers, labels, boxes, notes, forms, receipts, mail, calendars, product names, or instructions when useful.
 - Use Google object zones to make steps more spatial: top-left, right side, lower center, front edge, etc. Do not let OCR or labels override your direct visual read of the image.
 - Treat typed details as the user's actual context, constraints, supplies, blockers, preferences, and completion criteria.
 - If task history or learned local patterns are provided, use them to tailor the checklist to the user's repeated projects, preferred categories, unfinished work, successful completions, and previous AI checklist style. Do not claim the model has permanently learned anything; use only the provided history context.
-- For photo tasks, return 5 to 8 highly specific micro-steps. Do not return more than 8 photo steps unless the user explicitly asks for a longer checklist.
-- Each photo step should usually be 18 to 45 words and include: where to look, the exact visible object or area, what to do with it, and how the user knows that step is done.
+- For photo tasks, return 5 to 8 steps when possible. If the task is tiny, return 2 to 4 steps.
+- For photo tasks, every step must name at least one image-specific detail: an object, surface, room area, color, material, readable word, label, container, pile, stain, cord, tool, or exact zone from the submitted photo.
+- Avoid generic standalone targets like "the area", "items", "stuff", "things", "clutter", "trash", "surface", or "floor" unless paired with a specific photo detail such as "white counter", "mail pile", "blue bin", "lower-right cords", or OCR text.
+- Each step should usually be 4 to 10 words.
+- Each step must be a clear action the user can do right away.
+- Do not write long instructions, broad explanations, or multi-clause sentences.
 - If OCR text is visible, include the actual readable words in the relevant steps, such as the title on a paper, label, box, form, note, bill, envelope, or receipt.
-- Split document and paper tasks by visible document identity. Prefer "set the visible ELECTRIC BILL paper in a pay-today spot" over "sort papers."
-- The summary must mention 2 to 4 specific visible anchors from the photo, not a generic description.
-- Every step must pass this test: if the user handed the step to another person, that person could point to the exact area or object in the photo and know when to stop.
-- Do not use placeholder nouns such as "items", "things", "area", "stuff", "clutter", or "mess" unless they are paired with a visible location and object type.
-- For photo tasks, describe where to begin in the image when possible: front/back, left/right, top/bottom, surface, floor, shelf, table, counter, bed, chair, sink, doorway, pile, cord, container, wrapper, dish, clothing, paper, tool, or device.
-- Use photo-specific ordering instead of broad categories. Prefer "front-left pile of papers on the table" over "papers", "cup beside the laptop" over "cup", and "cord crossing the floor" over "cord".
-- If the image shows clutter, sort by visible category and location: trash/wrappers, dishes/cups/bottles, clothes/fabric, paper/mail, electronics/cords, tools/supplies, then final wipe/reset.
-- Do not collapse multiple visible areas into one step. Make separate steps for separate surfaces, piles, corners, containers, or object groups.
-- Avoid generic "clean the area" language. Use commands like "pick up", "move", "throw away", "stack", "wipe", "plug in", "put into", "set beside", "open", "empty", "close", and "take a second photo".
-- Include the first physical action the user should take.
-- Include setup, doing, and finish/check steps when useful.
-- Tailor wording to the user's stated situation. Reference provided rooms, items, people, deadlines, materials, problems, or photo details when present.
-- Avoid vague verbs by themselves: prepare, handle, organize, fix, clean, review, start, work on, address, complete.
-- Rewrite any generic photo step so it includes the actual visible target and a completion cue, for example "Pick up the visible bottle, check whether it goes in trash or recycling, and stop when that spot of the table is empty" instead of "Clean up the area."
-- If a step still sounds generic, replace it with a smaller visible action before returning JSON.
+- Use simple action verbs tied to specifics: lift, clear, sort, toss, stack, wipe, move, group, fold, bag, rinse, vacuum, or put away.
+- Prefer steps like "Stack papers on left desk", "Bag lower-right food wrappers", "Wipe white counter stain", or "Coil cord by outlet".
+- Do not say things like "locate the front-left corner" or other camera-style instructions.
+- Do not mention the word "visible" unless needed for disambiguation.
+- Do not add punctuation unless needed.
 - Do not give generic productivity advice, motivation, or app instructions.
-- Do not add unrelated unrelated advice.
+- Do not add unrelated advice.
 - Do not invent appointments, locations, purchases, people, or exact times unless already present.
 - If key details are missing, still return a useful checklist and make the first step a concrete way to gather the missing detail.
-- If the task is already tiny, return 2 to 3 setup/completion/check steps.`;
+- If the task is already tiny, return 2 to 4 setup/completion/check steps.`;
 
 const safetySchemaPrompt = `You are a safety scanner for a private task journal app.
 Scan journal entries and local task notes for self-harm, suicide risk, severe hopelessness, plans, means, goodbye/final-note language, or escalating distress.
@@ -523,7 +518,7 @@ function getRequestPath(request) {
 function setCorsHeaders(response) {
   response.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token,Authorization");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type,X-App-Token,Authorization,X-Task-Meta");
 }
 
 function sendJson(response, statusCode, payload) {
@@ -730,9 +725,9 @@ async function breakDownTask(task) {
 async function repairTaskBreakdown(task, breakdown) {
   const repairPrompt = `${taskBreakdownSchemaPrompt}
 
-The previous checklist failed quality review because it was too short, too generic, or did not include enough visible anchors.
-Repair it now. Keep useful facts, but rewrite the checklist so every photo step is specific, physical, and verifiable.
-Return only valid JSON with 9 to 12 steps.`;
+The previous checklist failed quality review because it was too long, too generic, or used camera-style instructions.
+Repair it now. Keep useful facts, but rewrite the checklist so every photo step names a specific object, surface, material, color, readable label, pile, tool, cord, damage, stain, or zone from the submitted image.
+Return only valid JSON with 5 to 8 steps unless the task is tiny.`;
   const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -770,16 +765,18 @@ Return only valid JSON with 9 to 12 steps.`;
 
 function needsTaskBreakdownRepair(breakdown, task) {
   if (!task?.imageDataUrl || !Array.isArray(breakdown?.steps)) return false;
-  if (breakdown.steps.length < 9) return true;
+  if (breakdown.steps.length < 5 || breakdown.steps.length > 8) return true;
   const weakSteps = breakdown.steps.filter((step) => isWeakPhotoChecklistStep(step?.text));
-  return weakSteps.length >= Math.ceil(breakdown.steps.length / 3);
+  return weakSteps.length > 0;
 }
 
 function isWeakPhotoChecklistStep(text) {
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
   const words = cleanText.split(/\s+/).filter(Boolean);
-  if (words.length < 26) return true;
-  return /\b(sort them|tidy up|organize the area|clear and organized|respective places|necessary items|other correspondence|review the sorted items|check for any other|make sure everything)\b/i.test(cleanText);
+  if (words.length < 4 || words.length > 10) return true;
+  return /\b(locate|find|inspect|review|check the|look at|front-left corner|front right corner|camera|photo|visible)\b/i.test(cleanText) ||
+    /\b(sort them|tidy up|organize the area|clear and organized|respective places|necessary items|other correspondence|review the sorted items|check for any other|make sure everything)\b/i.test(cleanText) ||
+    /\b(clear|clean|organize|tidy|sort|pick up|put away|wipe|vacuum|remove)\s+(the\s+)?(area|items|stuff|things|clutter|mess|trash|surface|floor|space|room)\b/i.test(cleanText);
 }
 
 async function enrichTaskWithGoogleVision(task) {
@@ -1064,7 +1061,7 @@ function buildTaskBreakdownUserContent(task) {
   if (!imageDataUrl) return text;
   return [
     { type: "text", text },
-    { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } }
+    { type: "image_url", image_url: { url: imageDataUrl, detail: "high" } }
   ];
 }
 
@@ -1078,16 +1075,16 @@ function buildTaskBreakdownRepairUserContent(task, breakdown) {
     },
     failedChecklist: breakdown,
     repairRequirements: [
-      "Return 9 to 12 photo-specific steps.",
+      "Return 5 to 8 photo-specific steps.",
       "Each step must name a visible object, readable text, surface, pile, side, or zone.",
-      "Each step must include the action, destination, and done-check.",
+      "Each step must include an action and a photo-specific target.",
       "Do not use generic cleanup wording."
     ]
   });
   if (!imageDataUrl) return text;
   return [
     { type: "text", text },
-    { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } }
+    { type: "image_url", image_url: { url: imageDataUrl, detail: "high" } }
   ];
 }
 
