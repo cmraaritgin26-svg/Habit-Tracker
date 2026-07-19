@@ -18,8 +18,8 @@ const MAX_TTS_INPUT_CHARS = 1800;
 const GOOGLE_VISION_TIMEOUT_MS = Number(process.env.GOOGLE_VISION_TIMEOUT_MS || 4500);
 const TASK_BREAKDOWN_CACHE_LIMIT = Number(process.env.TASK_BREAKDOWN_CACHE_LIMIT || 120);
 const TASK_BREAKDOWN_CACHE_TTL_MS = Number(process.env.TASK_BREAKDOWN_CACHE_TTL_MS || 1000 * 60 * 60 * 24);
-const TASK_BREAKDOWN_CACHE_VERSION = "fast-vision-v1";
-const BACKEND_BUILD = "fast-ai-v1";
+const TASK_BREAKDOWN_CACHE_VERSION = "overwhelmed-steps-v5";
+const BACKEND_BUILD = "overwhelmed-guidance-v4";
 const taskBreakdownCache = new Map();
 const OPENAI_TTS_VOICES = new Set([
   "alloy",
@@ -83,6 +83,8 @@ Return only valid JSON:
 }
 Rules:
 - Use the task name, note, typed details, image question, category, priority, date, day, and deadline if provided.
+- If overwhelmedMode is true, return 5 to 10 short steps, sort them from easiest and lowest effort to more involved, and make the first action safe and achievable in about two minutes.
+- If overwhelmedMode is true, use calm supportive wording without shame, pressure, or a long explanation. Each step should normally be 3 to 8 words.
 - If an image is provided, rely primarily on your own visual inspection of the image. Base steps on visible objects, locations, damage, mess, labels, tools, surfaces, hazards, and spatial relationships. Infer cautiously and say "visible" or "appears" when needed.
 - Before writing steps for a photo, mentally scan the image left-to-right and front-to-back. Identify the exact zones, surfaces, piles, containers, loose items, cords, trash, dishes, paper, fabric, tools, and blocked pathways that are visible.
 - If googleVisionContext is provided, use it as helper evidence from OCR, object localization, and image labels. Use OCR text to name visible papers, labels, boxes, notes, forms, receipts, mail, calendars, product names, or instructions when useful.
@@ -948,6 +950,7 @@ function sanitizeTaskForBreakdown(task) {
     note: limitText(task.note, 300),
     dictationDetails: limitText(task.dictationDetails, 2500),
     issueQuestion: limitText(task.issueQuestion, 500),
+    overwhelmedMode: Boolean(task.overwhelmedMode),
     googleVisionContext: limitText(task.googleVisionContext, 1800),
     imageDataUrl
   };
